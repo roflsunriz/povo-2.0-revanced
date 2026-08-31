@@ -40,7 +40,7 @@ jobs:
         shell: pwsh
         run: ./scripts/generate-patches-json.ps1 -Version "${{ steps.version.outputs.version }}" -OutputPath "dist/patches.json"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: patches
           path: |
