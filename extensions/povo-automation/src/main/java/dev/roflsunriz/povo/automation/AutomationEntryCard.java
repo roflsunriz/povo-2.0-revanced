@@ -113,7 +113,11 @@ final class AutomationEntryCard {
             return;
         }
 
-        String status = state.enabled() ? Strings.automationEnabled() : Strings.automationPaused();
+        String status = state.hasRemainingUses()
+                ? (state.enabled() ? Strings.automationEnabled() : Strings.automationPaused())
+                : Strings.allUsesCompleted();
+        status += " · " + Strings.usesProgress(state.appliedUses(), state.maxUses());
+        status += " · " + Strings.durationPerUse(state.durationHours());
         long expiry = state.currentExpiry();
         if (expiry > 0L) {
             status += " · " + Strings.nextAt(DateFormat.getDateTimeInstance().format(new Date(expiry)));

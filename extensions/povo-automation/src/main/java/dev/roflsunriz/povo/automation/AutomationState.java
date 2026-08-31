@@ -21,6 +21,9 @@ final class AutomationState {
     private static final String KEY_DEADLINE = "deadline_epoch_ms";
     private static final String KEY_EXPIRY = "current_expiry_epoch_ms";
     private static final String KEY_SUCCESSES = "success_count";
+    private static final String KEY_MAX_USES = "max_uses";
+    private static final String KEY_APPLIED_USES = "applied_uses";
+    private static final String KEY_DURATION_HOURS = "duration_hours";
     private static final String KEY_LAST_APPLIED = "last_applied_epoch_ms";
     private static final String KEY_LAST_STATUS = "last_status";
 
@@ -80,9 +83,42 @@ final class AutomationState {
         return preferences.getInt(KEY_SUCCESSES, 0);
     }
 
+    int maxUses() {
+        return Math.max(1, preferences.getInt(KEY_MAX_USES, 24));
+    }
+
+    int appliedUses() {
+        return Math.max(0, Math.min(preferences.getInt(KEY_APPLIED_USES, 0), maxUses()));
+    }
+
+    boolean hasRemainingUses() {
+        return appliedUses() < maxUses();
+    }
+
+    int durationHours() {
+        return Math.max(1, preferences.getInt(KEY_DURATION_HOURS, 168));
+    }
+
+    long durationMillis() {
+        return durationHours() * 60L * 60L * 1000L;
+    }
+
+    void setPlan(int maxUses, int appliedUses, int durationHours) {
+        preferences.edit()
+                .putInt(KEY_MAX_USES, maxUses)
+                .putInt(KEY_APPLIED_USES, appliedUses)
+                .putInt(KEY_DURATION_HOURS, durationHours)
+                .apply();
+    }
+
+    void setDurationHours(int durationHours) {
+        preferences.edit().putInt(KEY_DURATION_HOURS, durationHours).apply();
+    }
+
     void recordSuccess(long appliedAt) {
         preferences.edit()
                 .putInt(KEY_SUCCESSES, successCount() + 1)
+                .putInt(KEY_APPLIED_USES, Math.min(maxUses(), appliedUses() + 1))
                 .putLong(KEY_LAST_APPLIED, appliedAt)
                 .apply();
     }

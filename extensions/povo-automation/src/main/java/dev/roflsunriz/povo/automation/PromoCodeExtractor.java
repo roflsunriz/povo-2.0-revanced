@@ -18,15 +18,19 @@ final class PromoCodeExtractor {
     private static final Pattern DATE = Pattern.compile(
             "(20\\d{2})\\s*(?:年|[/-])\\s*(\\d{1,2})\\s*(?:月|[/-])\\s*(\\d{1,2})\\s*日?(?:\\s*(\\d{1,2})[:：](\\d{2}))?"
     );
+    private static final Pattern DURATION = Pattern.compile(
+            "(?i)(?:使い放題|unlimited)[^\\r\\n0-9]{0,30}(\\d{1,4})\\s*(時間|日間|日|hours?|days?)"
+    );
 
     private PromoCodeExtractor() {}
 
     static Result extract(String input) {
-        if (input == null) return new Result("", 0L, false);
+        if (input == null) return new Result("", 0L, false, 0);
         String normalized = input.trim();
+        int durationHours = durationHours(normalized);
         Matcher labeled = LABELED_CODE.matcher(normalized);
         if (labeled.find()) {
-            return new Result(labeled.group(1).toUpperCase(Locale.ROOT), latestDate(normalized), true);
+            return new Result(labeled.group(1).toUpperCase(Locale.ROOT), latestDate(normalized), true, durationHours);
         }
 
         List<String> candidates = new ArrayList<>();
@@ -39,7 +43,21 @@ final class PromoCodeExtractor {
         }
         String code = candidates.isEmpty() ? normalized : candidates.get(candidates.size() - 1);
         boolean emailLike = normalized.indexOf('\n') >= 0 || normalized.indexOf('\r') >= 0 || normalized.length() > 80;
-        return new Result(code.toUpperCase(Locale.ROOT), latestDate(normalized), emailLike);
+        return new Result(code.toUpperCase(Locale.ROOT), latestDate(normalized), emailLike, durationHours);
+    }
+
+    private static int durationHours(String value) {
+        Matcher matcher = DURATION.matcher(value);
+        if (!matcher.find()) return 0;
+        int amount;
+        try {
+            amount = Integer.parseInt(matcher.group(1));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+        String unit = matcher.group(2).toLowerCase(Locale.ROOT);
+        int hours = unit.startsWith("日") || unit.startsWith("day") ? amount * 24 : amount;
+        return hours >= 1 && hours <= 8760 ? hours : 0;
     }
 
     private static boolean containsLetterAndDigit(String value) {
@@ -77,11 +95,13 @@ final class PromoCodeExtractor {
         final String code;
         final long deadline;
         final boolean emailLike;
+        final int durationHours;
 
-        Result(String code, long deadline, boolean emailLike) {
+        Result(String code, long deadline, boolean emailLike, int durationHours) {
             this.code = code;
             this.deadline = deadline;
             this.emailLike = emailLike;
+            this.durationHours = durationHours;
         }
     }
 }

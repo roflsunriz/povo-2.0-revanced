@@ -24,6 +24,12 @@ public final class AutomationSettingsActivity extends Activity {
     private TextView status;
     private EditText input;
     private EditText expiryInput;
+    private EditText maxUsesInput;
+    private EditText currentUseInput;
+    private EditText durationHoursInput;
+    private Button primaryButton;
+    private Button toggleButton;
+    private Button clearButton;
     private LinearLayout root;
 
     @Override
@@ -71,6 +77,36 @@ public final class AutomationSettingsActivity extends Activity {
         inputParams.topMargin = dp(20);
         root.addView(input, inputParams);
 
+        AutomationState initialState = Automation.requireState();
+        LinearLayout useCounts = new LinearLayout(this);
+        useCounts.setOrientation(LinearLayout.HORIZONTAL);
+        useCounts.setLayoutDirection(View.LAYOUT_DIRECTION_LOCALE);
+        LinearLayout.LayoutParams countsParams = matchWrap();
+        countsParams.topMargin = dp(12);
+        root.addView(useCounts, countsParams);
+
+        maxUsesInput = new EditText(this);
+        maxUsesInput.setHint(Strings.maxUsesHint());
+        maxUsesInput.setText(String.valueOf(initialState.maxUses()));
+        maxUsesInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        useCounts.addView(maxUsesInput, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        currentUseInput = new EditText(this);
+        currentUseInput.setHint(Strings.currentUseHint());
+        currentUseInput.setText(String.valueOf(initialState.appliedUses()));
+        currentUseInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        LinearLayout.LayoutParams currentParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        currentParams.setMarginStart(dp(8));
+        useCounts.addView(currentUseInput, currentParams);
+
+        durationHoursInput = new EditText(this);
+        durationHoursInput.setHint(Strings.durationHoursHint());
+        durationHoursInput.setText(String.valueOf(initialState.durationHours()));
+        durationHoursInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        LinearLayout.LayoutParams durationParams = matchWrap();
+        durationParams.topMargin = dp(12);
+        root.addView(durationHoursInput, durationParams);
+
         expiryInput = new EditText(this);
         expiryInput.setHint(Strings.expiryInputHint());
         expiryInput.setSingleLine(true);
@@ -79,40 +115,24 @@ public final class AutomationSettingsActivity extends Activity {
         expiryParams.topMargin = dp(12);
         root.addView(expiryInput, expiryParams);
 
-        addButton(Strings.saveExpiry(), view -> {
-            if (Automation.setManualExpiry(expiryInput.getText().toString())) {
-                expiryInput.setText("");
-            } else {
-                expiryInput.setError(Strings.invalidExpiry());
-            }
-            refresh();
-        });
-
-        addButton(Strings.save(), view -> {
-            String raw = input.getText().toString();
-            String extracted = Automation.preparePromoInput(raw);
-            input.setText("");
-            if (!extracted.equals(raw.trim())) input.setHint(mask(extracted));
-            refresh();
-        });
-        addButton(Strings.enable(), view -> {
+        primaryButton = addButton(Strings.save(), view -> saveAndEnable());
+        toggleButton = addButton("", view -> {
             AutomationState state = Automation.requireState();
-            if (state.code() != null) state.setEnabled(true);
+            if (state.code() != null) Automation.setEnabled(!state.enabled());
             refresh();
         });
-        addButton(Strings.disable(), view -> {
-            Automation.requireState().setEnabled(false);
-            AlarmScheduler.cancel(this);
-            refresh();
-        });
-        addButton(Strings.requestExact(), view -> requestExactAlarm());
-        addButton(Strings.clear(), view -> new AlertDialog.Builder(this)
+        clearButton = addButton(Strings.clear(), view -> new AlertDialog.Builder(this)
                 .setTitle(Strings.clear())
                 .setMessage(Strings.clear())
                 .setNegativeButton(android.R.string.cancel, null)
                 .setPositiveButton(android.R.string.ok, (dialog, which) -> {
                     AlarmScheduler.cancel(this);
                     Automation.requireState().clear();
+                    input.setText("");
+                    expiryInput.setText("");
+                    maxUsesInput.setText("24");
+                    currentUseInput.setText("0");
+                    durationHoursInput.setText("168");
                     refresh();
                 })
                 .show());
@@ -132,22 +152,70 @@ public final class AutomationSettingsActivity extends Activity {
         String code = state.code();
         StringBuilder text = new StringBuilder();
         text.append(code == null ? Strings.noCode() : mask(code));
-        text.append("\n").append(state.enabled() ? Strings.enable() : Strings.disable());
+        text.append("\n").append(state.enabled() ? Strings.automationEnabled() : Strings.automationPaused());
         if (state.currentExpiry() > 0L) {
             text.append("\n")
                     .append(DateFormat.getDateTimeInstance().format(new Date(state.currentExpiry())));
         }
-        text.append("\n").append(state.successCount());
+        text.append("\n").append(Strings.usesProgress(state.appliedUses(), state.maxUses()));
+        text.append(" · ").append(Strings.durationPerUse(state.durationHours()));
+        text.append("\n").append(Strings.successCount(state.successCount()));
         if (!state.lastStatus().isEmpty()) text.append("\n").append(state.lastStatus());
         if (Build.VERSION.SDK_INT >= 31) {
             AlarmManager alarms = (AlarmManager) getSystemService(ALARM_SERVICE);
             if (!alarms.canScheduleExactAlarms()) text.append("\n").append(Strings.exactAlarmRequired());
         }
         status.setText(text.toString());
+        toggleButton.setText(state.enabled() ? Strings.disable() : Strings.enable());
+        boolean configured = code != null;
+        primaryButton.setText(configured ? Strings.updateSettings() : Strings.save());
+        toggleButton.setVisibility(configured ? View.VISIBLE : View.GONE);
+        clearButton.setVisibility(configured ? View.VISIBLE : View.GONE);
+    }
+
+    private void saveAndEnable() {
+        boolean valid = Automation.setUseProgress(
+                maxUsesInput.getText().toString(),
+                currentUseInput.getText().toString(),
+                durationHoursInput.getText().toString()
+        );
+        if (!valid) {
+            currentUseInput.setError(Strings.invalidUseProgress());
+            return;
+        }
+
+        AutomationState state = Automation.requireState();
+        String expiryText = expiryInput.getText().toString().trim();
+        if (!expiryText.isEmpty() && !Automation.setManualExpiry(expiryText)) {
+            expiryInput.setError(Strings.invalidExpiry());
+            return;
+        }
+        if (state.currentExpiry() <= System.currentTimeMillis()) {
+            expiryInput.setError(Strings.invalidExpiry());
+            return;
+        }
+
+        String raw = input.getText().toString();
+        if (!raw.trim().isEmpty()) {
+            String extracted = Automation.preparePromoInput(raw);
+            if (!extracted.equals(raw.trim())) input.setHint(mask(extracted));
+        }
+        if (state.code() == null) {
+            input.setError(Strings.pasteHint());
+            return;
+        }
+
+        input.setText("");
+        expiryInput.setText("");
+        Automation.setEnabled(true);
+        refresh();
+        requestExactAlarm();
     }
 
     private void requestExactAlarm() {
         if (Build.VERSION.SDK_INT < 31) return;
+        AlarmManager alarms = (AlarmManager) getSystemService(ALARM_SERVICE);
+        if (alarms.canScheduleExactAlarms()) return;
         Intent intent = new Intent(
                 Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
                 Uri.parse("package:" + getPackageName())
@@ -155,7 +223,7 @@ public final class AutomationSettingsActivity extends Activity {
         startActivity(intent);
     }
 
-    private void addButton(String label, View.OnClickListener listener) {
+    private Button addButton(String label, View.OnClickListener listener) {
         Button button = new Button(this);
         button.setText(label);
         button.setAllCaps(false);
@@ -163,6 +231,7 @@ public final class AutomationSettingsActivity extends Activity {
         LinearLayout.LayoutParams params = matchWrap();
         params.topMargin = dp(10);
         root.addView(button, params);
+        return button;
     }
 
     private LinearLayout.LayoutParams matchWrap() {

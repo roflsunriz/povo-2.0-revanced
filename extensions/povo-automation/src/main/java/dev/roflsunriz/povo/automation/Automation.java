@@ -23,8 +23,7 @@ import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class Automation {
-    private static final long TOPPING_DURATION_MS = 168L * 60L * 60L * 1000L;
-    private static final long DURATION_TOLERANCE_MS = 2L * 60L * 60L * 1000L;
+    private static final long MIN_DURATION_TOLERANCE_MS = 10L * 60L * 1000L;
     private static final long APPLY_LEAD_MS = 2_000L;
     private static final long FAST_RETRY_MS = 3_000L;
     private static final long SLOW_RETRY_MS = 60_000L;
@@ -106,6 +105,7 @@ public final class Automation {
             toast(Strings.encryptionFailed());
             return result.code;
         }
+        if (result.durationHours > 0) localState.setDurationHours(result.durationHours);
         if (result.deadline > System.currentTimeMillis()) localState.setDeadline(result.deadline);
         localState.setLastStatus(Strings.codeSaved());
         Notifications.status(requireContext(), Strings.settingsTitle(), Strings.codeSaved());
@@ -134,6 +134,36 @@ public final class Automation {
             }
         }
         return false;
+    }
+
+    public static void setEnabled(boolean enabled) {
+        AutomationState localState = requireState();
+        if (enabled && !localState.hasRemainingUses()) return;
+        localState.setEnabled(enabled);
+        if (enabled) scheduleKnownExpiry();
+        else AlarmScheduler.cancel(requireContext());
+    }
+
+    public static boolean setUseProgress(String maxInput, String currentInput, String durationInput) {
+        try {
+            int maxUses = Integer.parseInt(maxInput.trim());
+            int currentUse = Integer.parseInt(currentInput.trim());
+            int durationHours = Integer.parseInt(durationInput.trim());
+            if (maxUses < 1 || maxUses > 999 || currentUse < 0 || currentUse > maxUses
+                    || durationHours < 1 || durationHours > 8760) return false;
+            AutomationState localState = requireState();
+            localState.setPlan(maxUses, currentUse, durationHours);
+            if (!localState.hasRemainingUses()) {
+                localState.setEnabled(false);
+                localState.setLastStatus(Strings.allUsesCompleted());
+                AlarmScheduler.cancel(requireContext());
+            } else {
+                scheduleKnownExpiry();
+            }
+            return true;
+        } catch (NumberFormatException ignored) {
+            return false;
+        }
     }
 
     public static void onAddonPayload(Object payload) {
@@ -194,17 +224,19 @@ public final class Automation {
 
     private static void recordToppingWindow(long start, long expiry) {
         if (start <= 0L || expiry <= 0L) return;
+        AutomationState localState = requireState();
+        long expectedDuration = localState.durationMillis();
+        long tolerance = Math.max(MIN_DURATION_TOLERANCE_MS, expectedDuration / 100L);
         long duration = expiry - start;
-        if (Math.abs(duration - TOPPING_DURATION_MS) > DURATION_TOLERANCE_MS) return;
+        if (Math.abs(duration - expectedDuration) > tolerance) return;
         long now = System.currentTimeMillis();
         if (expiry < now - 5L * 60L * 1000L) return;
 
-        AutomationState localState = requireState();
         long previous = localState.currentExpiry();
         if (previous > now && previous <= expiry) return;
         localState.setCurrentExpiry(expiry);
-        localState.setLastStatus(Strings.toppingDetected());
-        Log.i("povo-automation", "Detected a 168-hour topping window");
+        localState.setLastStatus(Strings.toppingDetected(localState.durationHours()));
+        Log.i("povo-automation", "Detected a configured topping window");
         scheduleKnownExpiry();
     }
 
@@ -217,7 +249,15 @@ public final class Automation {
         if (transportSucceeded && codeAccepted) {
             long now = System.currentTimeMillis();
             localState.recordSuccess(now);
-            long nextExpiry = Math.max(now, localState.currentExpiry()) + TOPPING_DURATION_MS;
+            if (!localState.hasRemainingUses()) {
+                localState.setEnabled(false);
+                localState.setLastStatus(Strings.allUsesCompleted());
+                AlarmScheduler.cancel(requireContext());
+                Notifications.status(requireContext(), Strings.settingsTitle(), Strings.allUsesCompleted());
+                finishService();
+                return;
+            }
+            long nextExpiry = Math.max(now, localState.currentExpiry()) + localState.durationMillis();
             localState.setCurrentExpiry(nextExpiry);
             localState.setLastStatus(Strings.success());
             AlarmScheduler.schedule(requireContext(), nextExpiry);
@@ -258,7 +298,7 @@ public final class Automation {
         AutomationService running = service;
         if (running == null) return;
         String code = localState.code();
-        if (!localState.enabled() || code == null) {
+        if (!localState.enabled() || code == null || !localState.hasRemainingUses()) {
             running.finishWork();
             return;
         }
@@ -341,7 +381,7 @@ public final class Automation {
 
     private static void scheduleKnownExpiry() {
         AutomationState localState = requireState();
-        if (!localState.enabled() || localState.code() == null) return;
+        if (!localState.enabled() || localState.code() == null || !localState.hasRemainingUses()) return;
         long expiry = localState.currentExpiry();
         if (expiry > 0L) AlarmScheduler.schedule(requireContext(), expiry);
     }
