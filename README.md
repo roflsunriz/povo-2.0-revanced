@@ -10,6 +10,8 @@ ReVanced ManagerのURL欄には、GitHubのReleaseページや`github.com`で始
 https://raw.githubusercontent.com/roflsunriz/povo-2.0-revanced/main/patches.json
 ```
 
+> **v0.1.0を追加済みの場合:** v0.1.0のRVPにはManager用DEXが入っておらず、URL・ローカル追加ともエラーになります。失敗したsourceと古いRVPを削除し、一覧の版が`0.1.1`以降になるよう追加し直してください。
+
 ### URLから追加する手順（自動更新あり）
 
 1. [公式サイト](https://revanced.app/download)から最新版のReVanced Managerをインストールします。
@@ -147,10 +149,14 @@ java -jar APKEditor.jar m -i povo.apkm -o povo-universal.apk
 
 ### RVPを追加してもパッチが表示されない
 
+- v0.1.0のsourceまたはRVPを削除し、v0.1.1以降を追加し直します。
 - ファイル名が`povo-2.0-patches.rvp`か確認します。
 - HTMLページを保存したファイルではなく、ReleaseのRVP本体を選びます。
 - Patches一覧に「povo 2.0 automation patches」があるか確認します。
+- bundleの版が`0.1.1`以降で、「2 個のパッチ」と表示されることを確認します。
 - Managerを最新版へ更新して再起動します。
+
+ログに`EmptyMultiDexContainerException`がある場合はv0.1.0を読み込んでいます。古いsourceを削除してから再追加してください。
 
 ### povo APKを選べない・split APKエラーになる
 
