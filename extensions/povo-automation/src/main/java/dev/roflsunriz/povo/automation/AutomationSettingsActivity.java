@@ -23,6 +23,7 @@ import java.util.Date;
 public final class AutomationSettingsActivity extends Activity {
     private TextView status;
     private EditText input;
+    private EditText expiryInput;
     private LinearLayout root;
 
     @Override
@@ -47,6 +48,14 @@ public final class AutomationSettingsActivity extends Activity {
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         root.addView(title, matchWrap());
 
+        TextView guide = new TextView(this);
+        guide.setText(Strings.setupGuide());
+        guide.setTextSize(16f);
+        guide.setLineSpacing(0f, 1.2f);
+        LinearLayout.LayoutParams guideParams = matchWrap();
+        guideParams.topMargin = dp(14);
+        root.addView(guide, guideParams);
+
         status = new TextView(this);
         status.setTextSize(16f);
         LinearLayout.LayoutParams statusParams = matchWrap();
@@ -61,6 +70,23 @@ public final class AutomationSettingsActivity extends Activity {
         LinearLayout.LayoutParams inputParams = matchWrap();
         inputParams.topMargin = dp(20);
         root.addView(input, inputParams);
+
+        expiryInput = new EditText(this);
+        expiryInput.setHint(Strings.expiryInputHint());
+        expiryInput.setSingleLine(true);
+        expiryInput.setInputType(InputType.TYPE_CLASS_DATETIME);
+        LinearLayout.LayoutParams expiryParams = matchWrap();
+        expiryParams.topMargin = dp(12);
+        root.addView(expiryInput, expiryParams);
+
+        addButton(Strings.saveExpiry(), view -> {
+            if (Automation.setManualExpiry(expiryInput.getText().toString())) {
+                expiryInput.setText("");
+            } else {
+                expiryInput.setError(Strings.invalidExpiry());
+            }
+            refresh();
+        });
 
         addButton(Strings.save(), view -> {
             String raw = input.getText().toString();

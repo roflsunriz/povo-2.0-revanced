@@ -11,6 +11,7 @@ import org.w3c.dom.Document
 import org.w3c.dom.Element
 
 private const val PACKAGE_NAME = "com.kddi.kdla.jp"
+private const val TEST_PACKAGE_NAME = "com.kddi.kdla.jp.revanced"
 private const val APPLICATION_CLASS = "Lcom/circles/selfcare/AmApplication;"
 private const val PROMO_MODEL = "Lcom/circles/api/model/account/PromoCodeModel;"
 private const val EXTENSION_CLASS = "Ldev/roflsunriz/povo/automation/Automation;"
@@ -115,12 +116,23 @@ val povoPromoCodeAutomationPatch = bytecodePatch(
             "invoke-static/range {p0 .. p0}, $EXTENSION_CLASS->onAddonPayload(Ljava/lang/Object;)V",
         )
 
+        val userPlanParserMethod = firstMethod("addons_subscribed", "billing_cycle", "basic_plan", "monkey") {
+            parameterTypes.map(CharSequence::toString) == listOf("Ljava/lang/Object;") &&
+                returnType == "Ljava/lang/Object;"
+        }
+        userPlanParserMethod.addInstructions(
+            0,
+            "invoke-static/range {p1 .. p1}, $EXTENSION_CLASS->onUserPlanPayload(Ljava/lang/Object;)V",
+        )
+
         val koinGetMethod = firstMethod("KoinApplication has not been started") {
             parameterTypes.map(CharSequence::toString) == listOf("Ljava/lang/Class;") &&
                 returnType == "Ljava/lang/Object;"
         }
-        val koinGetReference =
-            "${koinGetMethod.definingClass}->${koinGetMethod.name}(Ljava/lang/Class;)Ljava/lang/Object;"
+        val koinClassName = koinGetMethod.definingClass
+            .removePrefix("L")
+            .removeSuffix(";")
+            .replace('/', '.')
 
         val onCreate = firstMethod {
             definingClass == APPLICATION_CLASS &&
@@ -128,19 +140,50 @@ val povoPromoCodeAutomationPatch = bytecodePatch(
                 parameterTypes.isEmpty() &&
                 returnType == "V"
         }
-        val returnIndex = onCreate.implementation!!.instructions.indexOfLast { it.opcode == Opcode.RETURN_VOID }
-        check(returnIndex >= 0) { "Application.onCreate return instruction was not found" }
+        val superOnCreateIndex = onCreate.implementation!!.instructions.indexOfFirst { instruction ->
+            instruction.opcode == Opcode.INVOKE_SUPER &&
+                ((instruction as? ReferenceInstruction)?.reference as? MethodReference)?.let { reference ->
+                    reference.definingClass == "Landroid/app/Application;" && reference.name == "onCreate"
+                } == true
+        }
+        check(superOnCreateIndex >= 0) { "Application.onCreate super call was not found" }
         onCreate.addInstructions(
-            returnIndex,
+            superOnCreateIndex + 1,
             """
                 invoke-static/range {p0 .. p0}, $EXTENSION_CLASS->initialize(Landroid/app/Application;)V
                 const-class v0, ${controllerCall.definingClass}
-                invoke-static {v0}, $koinGetReference
-                move-result-object v0
-                const-string v1, "${controllerCall.name}"
-                invoke-static {v0, v1}, $EXTENSION_CLASS->registerPromoController(Ljava/lang/Object;Ljava/lang/String;)V
+                const-string v1, "$koinClassName"
+                const-string v2, "${koinGetMethod.name}"
+                const-string v3, "${controllerCall.name}"
+                invoke-static {v0, v1, v2, v3}, $EXTENSION_CLASS->configurePromoController(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
             """.trimIndent(),
         )
+    }
+}
+
+@Suppress("unused")
+val povoTestPackagePatch = resourcePatch(
+    name = "検証用別パッケージID",
+    description = "公式版を残したまま実機検証できるよう、パッケージIDと衝突する識別子を別名化します。",
+    use = false,
+) {
+    compatibleWith(PACKAGE_NAME)
+    dependsOn(povoPromoCodeAutomationPatch)
+
+    apply {
+        document("AndroidManifest.xml").use { document ->
+            val manifest = document.documentElement
+            check(manifest.getAttribute("package") == PACKAGE_NAME) {
+                "Unexpected package name: ${manifest.getAttribute("package")}"
+            }
+            manifest.setAttribute("package", TEST_PACKAGE_NAME)
+
+            val elements = document.getElementsByTagName("*")
+            (0 until elements.length).forEach { index ->
+                val element = elements.item(index) as Element
+                element.renameConflictingAttributes()
+            }
+        }
     }
 }
 
@@ -194,4 +237,34 @@ private fun Element.addBootReceiver(document: Document) {
         filter.appendChild(action)
     }
     receiver.appendChild(filter)
+}
+
+private fun Element.renameConflictingAttributes() {
+    if (tagName in setOf("permission", "uses-permission", "action")) {
+        replaceAndroidAttributePrefix("name")
+    }
+
+    listOf(
+        "authorities",
+        "permission",
+        "readPermission",
+        "writePermission",
+        "taskAffinity",
+        "targetPackage",
+        "process",
+    ).forEach(::replaceAndroidAttributePrefix)
+}
+
+private fun Element.replaceAndroidAttributePrefix(attribute: String) {
+    val qualifiedName = "android:$attribute"
+    val value = getAttribute(qualifiedName).ifEmpty {
+        getAttributeNS(ANDROID_NAMESPACE, attribute)
+    }
+    if (!value.contains(PACKAGE_NAME)) return
+    val renamed = value.replace(PACKAGE_NAME, TEST_PACKAGE_NAME)
+    if (hasAttribute(qualifiedName)) {
+        setAttribute(qualifiedName, renamed)
+    } else {
+        setAttributeNS(ANDROID_NAMESPACE, qualifiedName, renamed)
+    }
 }

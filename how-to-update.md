@@ -60,6 +60,10 @@ $env:ORG_GRADLE_PROJECT_githubPackagesPassword = $revancedToken
    - APK v2/v3 署名
    - 16 KiB page alignment
 
+公式版を消さず実機確認する場合は「プロモコード自動更新」と「検証用別パッケージID」を同時に選ぶ。出力 package が `com.kddi.kdla.jp.revanced` で、元IDの provider authority・独自 permission/action・process が残っていないことを確認してからインストールする。
+
+16 KiB alignment は最終署名後に再検証する。既存APKの `META-INF/*.SF`、`*.RSA`、`*.DSA`、`*.EC`、`MANIFEST.MF` が残っていると、再署名時の削除でnative entryのoffsetが変わる。検証用APKは旧署名entryを除去してから `zipalign -P 16` を行い、その後に署名する。
+
 結果と対策を `verification.md` へ追記する。
 
 ## 5. バージョンと文書を更新する

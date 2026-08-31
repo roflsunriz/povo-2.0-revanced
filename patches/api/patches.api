@@ -1,3 +1,5 @@
 public final class dev/roflsunriz/povo/automation/PovoAutomationPatchKt {
-	public static final fun getPovoPromoCodeAutomationPatch ()Lapp/revanced/patcher/patch/BytecodePatch;
+	public static final fun getPovoPromoCodeAutomationPatch ()Lapp/revanced/patcher/patch/Patch;
+	public static final fun getPovoTestPackagePatch ()Lapp/revanced/patcher/patch/Patch;
 }
+
