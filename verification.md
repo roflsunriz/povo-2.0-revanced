@@ -19,7 +19,7 @@
 | Gradle `build` | 成功 |
 | Android lint | エラー・警告なし |
 | Java/Kotlin コンパイル | 成功 |
-| PromoCodeExtractor・商品モデル・結果対応付けユニットテスト（9件） | 成功 |
+| PromoCodeExtractor・商品モデル・結果対応付け・再試行ポリシーのユニットテスト（12件） | 成功 |
 | RVP を ReVanced CLI 6.0.0 で列挙 | 成功 |
 | Gradle `:patches:buildAndroid` | 成功、RVPに`classes.dex`を同梱 |
 | `scripts/verify-android-rvp.ps1` | 成功、DEX・manifest・extensionを確認 |
@@ -119,6 +119,22 @@ remote source経路はManager 2.6.0と同じUser-Agentでraw `patches.json`を�
 ネットワーク側にも失敗要因があった。16:40から16:59までpovoプロセスで毎分`Unable to resolve host`が記録され、少なくとも一部のDNS通信が成立していなかった。端末のdefault networkはWi-Fiとして`VALIDATED`を維持しており、ConnectivityService上のdefault network切断は確認できなかったが、上流がトッピング終了後のpovo回線だった場合、128kbpsへの速度低下やDNS/TLS遅延がAPI適用を妨げた可能性がある。記録された名前解決失敗はpovoプロモコードAPIのhostではないため、ネットワークだけを原因と断定はできない。
 
 ユーザー観測ではDocomo回線経由なら操作が円滑だった。次回はcontroller再解決を修正した上で、Docomo回線またはpovo以外の独立Wi-Fiをdefault networkにして再試験し、アプリ内部要因とpovo回線終端時の通信要因を分離する。
+
+## 128kbps境界対策
+
+v0.1.2では次の対策を追加した。
+
+- serviceの各試行からKoin promo controllerを再解決し、Activityを開いていないbackground起動でもAPI呼び出しへ進む
+- 終了12秒前から送信を開始し、終了前拒否を利用してDNS・TLS・API接続を事前確立する
+- 終了前後10分はAPI結果受信後3秒で再試行し、その後は60秒へ減速する
+- 非同期API応答を最大60秒待ち、watchdog timeoutまでは重複送信しない
+- active networkに`INTERNET` capabilityがない場合は5秒待ち、`VALIDATED`状態を秘密情報なしで診断ログへ残す
+- foreground service中だけ最大20分のPartial WakeLockを取得し、画面消灯中のCPU suspendを防ぐ
+- povo標準画面から保存済みの同一コードを手動適用した場合も、成功回数と次回予約を同期する
+
+再試行ポリシーは境界前開始、境界前後の高速再試行、10分後の減速、2時間後の停止をJVMユニットテストで固定した。実際の128kbps回線での完遂確認は2026-09-07 16:55終端の監視で行う。
+
+v0.1.2 Android RVPをpovo 1.70.0-JP統合APKへ適用し、「プロモコード自動更新」と「検証用別パッケージID」の両方が成功した。最終APKで`ACCESS_NETWORK_STATE`、`WAKE_LOCK`、`SCHEDULE_EXACT_ALARM`、別package ID、APK v2/v3署名、16KiB alignmentを確認した。通常版への上書きは端末がロック中だったため未実施。
 
 ## 未実施の実機確認
 

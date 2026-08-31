@@ -1,7 +1,7 @@
 {
   "download_url": "https://github.com/roflsunriz/povo-2.0-revanced/releases/latest/download/povo-2.0-patches.rvp",
-  "created_at": "2026-08-31T06:06:35",
+  "created_at": "2026-08-31T08:14:32",
   "signature_download_url": null,
   "description": "povo 2.0 のプリペイド・プロモコードを終端ごとに自動適用する ReVanced パッチ",
-  "version": "0.1.1"
+  "version": "0.1.2"
 }

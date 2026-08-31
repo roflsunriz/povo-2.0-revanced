@@ -4,6 +4,9 @@ import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
@@ -11,7 +14,6 @@ import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.ref.WeakReference;
 import java.text.ParseException;
@@ -21,15 +23,15 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 public final class Automation {
     private static final long MIN_DURATION_TOLERANCE_MS = 10L * 60L * 1000L;
-    private static final long APPLY_LEAD_MS = 2_000L;
-    private static final long FAST_RETRY_MS = 3_000L;
-    private static final long SLOW_RETRY_MS = 60_000L;
-    private static final long GIVE_UP_AFTER_MS = 2L * 60L * 60L * 1000L;
+    private static final long CONTROLLER_WARNING_INTERVAL_MS = 30_000L;
 
     private static final AtomicBoolean inFlight = new AtomicBoolean(false);
+    private static final AtomicLong attemptStartedAt = new AtomicLong(0L);
+    private static final AtomicLong lastControllerWarningAt = new AtomicLong(0L);
     private static final PromoResultGate promoResultGate = new PromoResultGate();
     private static volatile Application application;
     private static volatile AutomationState state;
@@ -79,12 +81,12 @@ public final class Automation {
         promoMethodName = promoMethod;
     }
 
-    private static void ensurePromoController() {
-        if (promoController != null) return;
+    private static boolean ensurePromoController() {
+        if (promoController != null) return true;
         Class<?> controllerClass = promoControllerClass;
         String owner = koinClassName;
         String resolver = koinMethodName;
-        if (controllerClass == null || owner == null || resolver == null) return;
+        if (controllerClass == null || owner == null || resolver == null) return false;
         try {
             Class<?> koinClass = Class.forName(owner);
             Method method = koinClass.getDeclaredMethod(resolver, Class.class);
@@ -93,8 +95,15 @@ public final class Automation {
             Log.i("povo-automation", "Logged-in promo controller resolved");
             AutomationService running = service;
             if (running != null) running.scheduleAttempt(0L);
+            return true;
         } catch (ReflectiveOperationException | RuntimeException error) {
-            Log.w("povo-automation", "Promo controller is not ready: " + error.getClass().getSimpleName());
+            long now = System.currentTimeMillis();
+            long previous = lastControllerWarningAt.get();
+            if (now - previous >= CONTROLLER_WARNING_INTERVAL_MS
+                    && lastControllerWarningAt.compareAndSet(previous, now)) {
+                Log.w("povo-automation", "Promo controller is not ready: " + error.getClass().getSimpleName());
+            }
+            return false;
         }
     }
 
@@ -109,7 +118,14 @@ public final class Automation {
     private static String registerPromoInput(String input, boolean expectHostResult) {
         PromoCodeExtractor.Result result = PromoCodeExtractor.extract(input);
         if (!isPlausibleCode(result.code)) return input == null ? "" : input.trim();
-        if (result.product.type == PromoProduct.Type.UNKNOWN) return result.code;
+        if (result.product.type == PromoProduct.Type.UNKNOWN) {
+            AutomationState existing = requireState();
+            if (expectHostResult && result.code.equals(existing.code())) {
+                promoResultGate.expectResult();
+                Log.i("povo-automation", "Tracking a manual submission of the stored code");
+            }
+            return result.code;
+        }
         AutomationState localState = requireState();
         if (!localState.saveCode(result.code, result.product)) {
             toast(Strings.encryptionFailed());
@@ -258,12 +274,14 @@ public final class Automation {
 
     public static void onPromoResult(Object result, Object model) {
         if (!promoResultGate.consumeExpectedResult()) return;
+        inFlight.set(false);
+        attemptStartedAt.set(0L);
         AutomationState localState = requireState();
         if (localState.code() == null) return;
-        inFlight.set(false);
         boolean transportSucceeded = ReflectionUtils.firstBoolean(result, false);
         boolean codeAccepted = ReflectionUtils.firstBoolean(model, false);
         if (transportSucceeded && codeAccepted) {
+            Log.i("povo-automation", "Promo application accepted");
             long now = System.currentTimeMillis();
             localState.recordSuccess(now);
             if (!localState.isRepeatableTimeCode() || !localState.hasRemainingUses()) {
@@ -290,6 +308,7 @@ public final class Automation {
 
         Object exception = ReflectionUtils.firstObjectField(result);
         int httpCode = ReflectionUtils.invokeInt(exception, "getHttpCode", -1);
+        Log.i("povo-automation", "Promo application not accepted; http=" + httpCode);
         if (httpCode == 401 || httpCode == 403) {
             localState.setLastStatus(Strings.authRequired());
             Notifications.status(requireContext(), Strings.settingsTitle(), Strings.authRequired());
@@ -314,6 +333,7 @@ public final class Automation {
     static void onServiceStopped(AutomationService stopped) {
         if (service == stopped) service = null;
         inFlight.set(false);
+        attemptStartedAt.set(0L);
         promoResultGate.cancel();
     }
 
@@ -340,13 +360,45 @@ public final class Automation {
             running.finishWork();
             return;
         }
-        long untilAttempt = expiry - APPLY_LEAD_MS - now;
+        long untilAttempt = RetryPolicy.firstAttemptDelay(now, expiry);
         if (untilAttempt > 0L) {
             running.showProgress(Strings.foregroundTitle());
             running.scheduleAttempt(untilAttempt);
             return;
         }
+        if (inFlight.get()) {
+            long elapsed = now - attemptStartedAt.get();
+            long remaining = RetryPolicy.REQUEST_WATCHDOG_MS - elapsed;
+            if (remaining > 0L) {
+                running.scheduleAttempt(remaining);
+                return;
+            }
+            Log.w("povo-automation", "Promo request watchdog expired; retrying");
+            promoResultGate.cancel();
+            inFlight.set(false);
+            attemptStartedAt.set(0L);
+        }
         if (!inFlight.compareAndSet(false, true)) return;
+
+        if (!ensurePromoController()) {
+            inFlight.set(false);
+            if (RetryPolicy.shouldGiveUp(now, expiry)) {
+                localState.setLastStatus("Automatic application needs review");
+                Notifications.status(requireContext(), Strings.settingsTitle(), localState.lastStatus());
+                running.finishWork();
+            } else {
+                running.scheduleAttempt(2_000L);
+            }
+            return;
+        }
+
+        int networkState = activeInternetState();
+        if (networkState == 0) {
+            inFlight.set(false);
+            Log.w("povo-automation", "No active internet network; retrying");
+            running.scheduleAttempt(RetryPolicy.NETWORK_RETRY_MS);
+            return;
+        }
 
         Object controller = promoController;
         String methodName = promoMethodName;
@@ -358,12 +410,17 @@ public final class Automation {
         try {
             Method method = controller.getClass().getMethod(methodName, String.class);
             promoResultGate.expectResult();
+            attemptStartedAt.set(now);
+            Log.i("povo-automation", "Invoking stored promo code; beforeBoundary="
+                    + (now < expiry) + "; validatedNetwork=" + (networkState == 2));
             method.invoke(controller, code);
-            inFlight.set(false);
-            running.scheduleAttempt(15_000L);
-        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException error) {
+            if (inFlight.get() && promoResultGate.isExpectingResult()) {
+                running.scheduleAttempt(RetryPolicy.REQUEST_WATCHDOG_MS);
+            }
+        } catch (ReflectiveOperationException | RuntimeException error) {
             promoResultGate.cancel();
             inFlight.set(false);
+            attemptStartedAt.set(0L);
             localState.setLastStatus("Could not invoke the logged-in promo-code API");
             running.scheduleAttempt(10_000L);
         }
@@ -389,21 +446,26 @@ public final class Automation {
         long now = System.currentTimeMillis();
         long expiry = localState.currentExpiry();
         AutomationService running = service;
-        if (expiry > now) {
-            AlarmScheduler.schedule(requireContext(), expiry);
-            if (running != null) running.finishWork();
-            return;
-        }
-        if (now - expiry > GIVE_UP_AFTER_MS) {
+        if (RetryPolicy.shouldGiveUp(now, expiry)) {
             localState.setLastStatus("Automatic application needs review");
             Notifications.status(requireContext(), Strings.settingsTitle(), localState.lastStatus());
             finishService();
             return;
         }
         if (running != null) {
-            long elapsed = now - expiry;
-            running.scheduleAttempt(elapsed < 10L * 60L * 1000L ? FAST_RETRY_MS : SLOW_RETRY_MS);
+            running.scheduleAttempt(RetryPolicy.retryDelay(now, expiry));
         }
+    }
+
+    private static int activeInternetState() {
+        ConnectivityManager manager = (ConnectivityManager) requireContext()
+                .getSystemService(Context.CONNECTIVITY_SERVICE);
+        Network network = manager.getActiveNetwork();
+        if (network == null) return 0;
+        NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
+        if (capabilities == null
+                || !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return 0;
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ? 2 : 1;
     }
 
     private static void scheduleKnownExpiry() {

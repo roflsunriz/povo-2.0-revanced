@@ -3,6 +3,7 @@ package dev.roflsunriz.povo.automation;
 import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
+import android.os.PowerManager;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -12,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 public final class AutomationService extends Service {
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
     private ScheduledFuture<?> scheduled;
+    private PowerManager.WakeLock wakeLock;
 
     @Override
     public void onCreate() {
@@ -21,6 +23,13 @@ public final class AutomationService extends Service {
                 Notifications.FOREGROUND_ID,
                 Notifications.foreground(this, Strings.foregroundTitle())
         );
+        PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+        wakeLock = power.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "povo-automation:boundary"
+        );
+        wakeLock.setReferenceCounted(false);
+        keepCpuAwake();
         Automation.onServiceStarted(this);
     }
 
@@ -31,6 +40,7 @@ public final class AutomationService extends Service {
     }
 
     synchronized void scheduleAttempt(long delayMs) {
+        keepCpuAwake();
         if (scheduled != null) scheduled.cancel(false);
         scheduled = executor.schedule(Automation::attempt, Math.max(0L, delayMs), TimeUnit.MILLISECONDS);
     }
@@ -40,6 +50,7 @@ public final class AutomationService extends Service {
     }
 
     void finishWork() {
+        releaseWakeLock();
         stopForeground(STOP_FOREGROUND_REMOVE);
         stopSelf();
     }
@@ -48,11 +59,24 @@ public final class AutomationService extends Service {
     public void onDestroy() {
         Automation.onServiceStopped(this);
         executor.shutdownNow();
+        releaseWakeLock();
         super.onDestroy();
     }
 
     @Override
     public IBinder onBind(Intent intent) {
         return null;
+    }
+
+    private void keepCpuAwake() {
+        PowerManager.WakeLock lock = wakeLock;
+        if (lock != null && !lock.isHeld()) {
+            lock.acquire(RetryPolicy.WAKE_LOCK_TIMEOUT_MS);
+        }
+    }
+
+    private void releaseWakeLock() {
+        PowerManager.WakeLock lock = wakeLock;
+        if (lock != null && lock.isHeld()) lock.release();
     }
 }

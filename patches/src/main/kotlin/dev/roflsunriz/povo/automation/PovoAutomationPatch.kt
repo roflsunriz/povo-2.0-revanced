@@ -28,6 +28,8 @@ private val automationManifestPatch = resourcePatch(
             listOf(
                 "android.permission.RECEIVE_BOOT_COMPLETED",
                 "android.permission.SCHEDULE_EXACT_ALARM",
+                "android.permission.ACCESS_NETWORK_STATE",
+                "android.permission.WAKE_LOCK",
                 "android.permission.FOREGROUND_SERVICE",
                 "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
             ).forEach(document::addPermission)

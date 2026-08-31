@@ -13,6 +13,10 @@ final class PromoResultGate {
         return expected.compareAndSet(true, false);
     }
 
+    boolean isExpectingResult() {
+        return expected.get();
+    }
+
     void cancel() {
         expected.set(false);
     }

@@ -4,9 +4,23 @@
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-31
+
+### Added
+
+- 画面消灯中でも境界処理のCPU実行を維持できるように、foreground service中だけ最大20分のPartial WakeLockを追加した。
+- 低速回線の切り分けができるように、コード・token・hostを出力せずcontroller解決、送信開始、境界前後、network validation、HTTP結果、watchdog timeoutを記録する診断ログを追加した。
+
+### Changed
+
+- トッピング終了後の128kbps回線でも送信を完遂しやすくするため、終了12秒前から安全な拒否を利用して接続を事前確立し、3秒間隔の再試行で終了境界をまたぐように変更した。
+- 非同期API応答を最大60秒待つwatchdogを追加し、応答前の重複送信を防ぎながらtimeout後に再試行するように変更した。
+
 ### Fixed
 
 - v0.1.0を追加済みの利用者が同じ読込エラーを繰り返さないように、失敗したsourceと旧RVPを削除し、v0.1.1以降へ追加し直す復旧手順をREADMEへ追記した。
+- background起動時にpromo controllerが未解決のまま2秒再試行を繰り返していた問題を修正し、service側からKoin controllerを再解決するようにした。
+- 同じ保存済みコードをpovo標準画面から手動適用した場合も成功回数と次回予約を同期するようにした。
 
 ## [0.1.1] - 2026-08-31
 
@@ -53,6 +67,7 @@
 
 - 長い入力による制御不能な再帰を防ぐため、ReVancedの推移依存で解決されていた脆弱な Apache Commons Lang 3.17.0 を、修正済みの3.20.0へ明示的に更新した（`GHSA-j288-q9x7-2f5v`）。
 
-[Unreleased]: https://github.com/roflsunriz/povo-2.0-revanced/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/roflsunriz/povo-2.0-revanced/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/roflsunriz/povo-2.0-revanced/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/roflsunriz/povo-2.0-revanced/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/roflsunriz/povo-2.0-revanced/releases/tag/v0.1.0

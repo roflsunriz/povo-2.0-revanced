@@ -143,7 +143,9 @@ public final class PromoCodeExtractorTest {
 
         assertFalse(gate.consumeExpectedResult());
         gate.expectResult();
+        assertTrue(gate.isExpectingResult());
         assertTrue(gate.consumeExpectedResult());
+        assertFalse(gate.isExpectingResult());
         assertFalse(gate.consumeExpectedResult());
         gate.expectResult();
         gate.cancel();
