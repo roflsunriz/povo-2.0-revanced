@@ -113,6 +113,11 @@ final class AutomationEntryCard {
             return;
         }
 
+        if (!state.isRepeatableTimeCode()) {
+            summary.setText(Strings.productType(state.product().type));
+            return;
+        }
+
         String status = state.hasRemainingUses()
                 ? (state.enabled() ? Strings.automationEnabled() : Strings.automationPaused())
                 : Strings.allUsesCompleted();

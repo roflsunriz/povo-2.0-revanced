@@ -130,9 +130,9 @@ public final class AutomationSettingsActivity extends Activity {
                     Automation.requireState().clear();
                     input.setText("");
                     expiryInput.setText("");
-                    maxUsesInput.setText("24");
+                    maxUsesInput.setText("1");
                     currentUseInput.setText("0");
-                    durationHoursInput.setText("168");
+                    durationHoursInput.setText("");
                     refresh();
                 })
                 .show());
@@ -157,8 +157,11 @@ public final class AutomationSettingsActivity extends Activity {
             text.append("\n")
                     .append(DateFormat.getDateTimeInstance().format(new Date(state.currentExpiry())));
         }
-        text.append("\n").append(Strings.usesProgress(state.appliedUses(), state.maxUses()));
-        text.append(" · ").append(Strings.durationPerUse(state.durationHours()));
+        text.append("\n").append(Strings.productType(state.product().type));
+        if (state.isRepeatableTimeCode()) {
+            text.append("\n").append(Strings.usesProgress(state.appliedUses(), state.maxUses()));
+            text.append(" · ").append(Strings.durationPerUse(state.durationHours()));
+        }
         text.append("\n").append(Strings.successCount(state.successCount()));
         if (!state.lastStatus().isEmpty()) text.append("\n").append(state.lastStatus());
         if (Build.VERSION.SDK_INT >= 31) {
@@ -169,47 +172,60 @@ public final class AutomationSettingsActivity extends Activity {
         toggleButton.setText(state.enabled() ? Strings.disable() : Strings.enable());
         boolean configured = code != null;
         primaryButton.setText(configured ? Strings.updateSettings() : Strings.save());
-        toggleButton.setVisibility(configured ? View.VISIBLE : View.GONE);
+        toggleButton.setVisibility(configured && state.isRepeatableTimeCode() ? View.VISIBLE : View.GONE);
         clearButton.setVisibility(configured ? View.VISIBLE : View.GONE);
     }
 
     private void saveAndEnable() {
-        boolean valid = Automation.setUseProgress(
-                maxUsesInput.getText().toString(),
-                currentUseInput.getText().toString(),
-                durationHoursInput.getText().toString()
-        );
-        if (!valid) {
-            currentUseInput.setError(Strings.invalidUseProgress());
-            return;
-        }
-
-        AutomationState state = Automation.requireState();
-        String expiryText = expiryInput.getText().toString().trim();
-        if (!expiryText.isEmpty() && !Automation.setManualExpiry(expiryText)) {
-            expiryInput.setError(Strings.invalidExpiry());
-            return;
-        }
-        if (state.currentExpiry() <= System.currentTimeMillis()) {
-            expiryInput.setError(Strings.invalidExpiry());
-            return;
-        }
-
         String raw = input.getText().toString();
         if (!raw.trim().isEmpty()) {
-            String extracted = Automation.preparePromoInput(raw);
+            String previousCode = Automation.requireState().code();
+            String extracted = Automation.savePromoInput(raw);
             if (!extracted.equals(raw.trim())) input.setHint(mask(extracted));
+            AutomationState extractedState = Automation.requireState();
+            maxUsesInput.setText(String.valueOf(extractedState.maxUses()));
+            if (extractedState.code() != null && !extractedState.code().equals(previousCode)) {
+                currentUseInput.setText("0");
+            }
+            durationHoursInput.setText(extractedState.durationHours() > 0
+                    ? String.valueOf(extractedState.durationHours())
+                    : "");
         }
+        AutomationState state = Automation.requireState();
         if (state.code() == null) {
             input.setError(Strings.pasteHint());
             return;
         }
 
+        if (state.isRepeatableTimeCode()) {
+            boolean valid = Automation.setUseProgress(
+                    maxUsesInput.getText().toString(),
+                    currentUseInput.getText().toString(),
+                    durationHoursInput.getText().toString()
+            );
+            if (!valid) {
+                currentUseInput.setError(Strings.invalidUseProgress());
+                return;
+            }
+
+            String expiryText = expiryInput.getText().toString().trim();
+            if (!expiryText.isEmpty() && !Automation.setManualExpiry(expiryText)) {
+                expiryInput.setError(Strings.invalidExpiry());
+                return;
+            }
+            if (state.currentExpiry() <= System.currentTimeMillis()) {
+                expiryInput.setError(Strings.invalidExpiry());
+                return;
+            }
+            Automation.setEnabled(true);
+            requestExactAlarm();
+        } else {
+            Automation.setEnabled(false);
+        }
+
         input.setText("");
         expiryInput.setText("");
-        Automation.setEnabled(true);
         refresh();
-        requestExactAlarm();
     }
 
     private void requestExactAlarm() {

@@ -30,6 +30,7 @@ public final class Automation {
     private static final long GIVE_UP_AFTER_MS = 2L * 60L * 60L * 1000L;
 
     private static final AtomicBoolean inFlight = new AtomicBoolean(false);
+    private static final PromoResultGate promoResultGate = new PromoResultGate();
     private static volatile Application application;
     private static volatile AutomationState state;
     private static volatile Object promoController;
@@ -98,20 +99,33 @@ public final class Automation {
     }
 
     public static String preparePromoInput(String input) {
+        return registerPromoInput(input, true);
+    }
+
+    static String savePromoInput(String input) {
+        return registerPromoInput(input, false);
+    }
+
+    private static String registerPromoInput(String input, boolean expectHostResult) {
         PromoCodeExtractor.Result result = PromoCodeExtractor.extract(input);
         if (!isPlausibleCode(result.code)) return input == null ? "" : input.trim();
+        if (result.product.type == PromoProduct.Type.UNKNOWN) return result.code;
         AutomationState localState = requireState();
-        if (!localState.saveCode(result.code)) {
+        if (!localState.saveCode(result.code, result.product)) {
             toast(Strings.encryptionFailed());
             return result.code;
         }
-        if (result.durationHours > 0) localState.setDurationHours(result.durationHours);
         if (result.deadline > System.currentTimeMillis()) localState.setDeadline(result.deadline);
-        localState.setLastStatus(Strings.codeSaved());
-        Notifications.status(requireContext(), Strings.settingsTitle(), Strings.codeSaved());
-        toast(Strings.codeSaved());
+        String savedStatus = result.product.isRepeatableTimeCode()
+                ? Strings.codeSaved()
+                : Strings.singleCodeSaved();
+        localState.setLastStatus(savedStatus);
+        Notifications.status(requireContext(), Strings.settingsTitle(), savedStatus);
+        toast(savedStatus);
         scheduleKnownExpiry();
-        if (result.emailLike) openSettingsSoon();
+        if (expectHostResult) promoResultGate.expectResult();
+        else promoResultGate.cancel();
+        if (expectHostResult && result.emailLike) openSettingsSoon();
         return result.code;
     }
 
@@ -138,7 +152,7 @@ public final class Automation {
 
     public static void setEnabled(boolean enabled) {
         AutomationState localState = requireState();
-        if (enabled && !localState.hasRemainingUses()) return;
+        if (enabled && (!localState.isRepeatableTimeCode() || !localState.hasRemainingUses())) return;
         localState.setEnabled(enabled);
         if (enabled) scheduleKnownExpiry();
         else AlarmScheduler.cancel(requireContext());
@@ -153,9 +167,11 @@ public final class Automation {
                     || durationHours < 1 || durationHours > 8760) return false;
             AutomationState localState = requireState();
             localState.setPlan(maxUses, currentUse, durationHours);
-            if (!localState.hasRemainingUses()) {
+            if (!localState.isRepeatableTimeCode() || !localState.hasRemainingUses()) {
                 localState.setEnabled(false);
-                localState.setLastStatus(Strings.allUsesCompleted());
+                if (localState.appliedUses() >= localState.maxUses()) {
+                    localState.setLastStatus(Strings.allUsesCompleted());
+                }
                 AlarmScheduler.cancel(requireContext());
             } else {
                 scheduleKnownExpiry();
@@ -241,6 +257,7 @@ public final class Automation {
     }
 
     public static void onPromoResult(Object result, Object model) {
+        if (!promoResultGate.consumeExpectedResult()) return;
         AutomationState localState = requireState();
         if (localState.code() == null) return;
         inFlight.set(false);
@@ -249,7 +266,7 @@ public final class Automation {
         if (transportSucceeded && codeAccepted) {
             long now = System.currentTimeMillis();
             localState.recordSuccess(now);
-            if (!localState.hasRemainingUses()) {
+            if (!localState.isRepeatableTimeCode() || !localState.hasRemainingUses()) {
                 localState.setEnabled(false);
                 localState.setLastStatus(Strings.allUsesCompleted());
                 AlarmScheduler.cancel(requireContext());
@@ -262,6 +279,11 @@ public final class Automation {
             localState.setLastStatus(Strings.success());
             AlarmScheduler.schedule(requireContext(), nextExpiry);
             Notifications.status(requireContext(), Strings.settingsTitle(), Strings.success());
+            finishService();
+            return;
+        }
+
+        if (!localState.enabled() || !localState.isRepeatableTimeCode()) {
             finishService();
             return;
         }
@@ -279,7 +301,8 @@ public final class Automation {
 
     static void restoreSchedule(Context context) {
         AutomationState restored = new AutomationState(context);
-        if (restored.enabled() && restored.code() != null && restored.currentExpiry() > 0L) {
+        if (restored.enabled() && restored.isRepeatableTimeCode()
+                && restored.code() != null && restored.currentExpiry() > 0L) {
             AlarmScheduler.schedule(context, restored.currentExpiry());
         }
     }
@@ -291,6 +314,7 @@ public final class Automation {
     static void onServiceStopped(AutomationService stopped) {
         if (service == stopped) service = null;
         inFlight.set(false);
+        promoResultGate.cancel();
     }
 
     static void attempt() {
@@ -298,7 +322,8 @@ public final class Automation {
         AutomationService running = service;
         if (running == null) return;
         String code = localState.code();
-        if (!localState.enabled() || code == null || !localState.hasRemainingUses()) {
+        if (!localState.enabled() || !localState.isRepeatableTimeCode()
+                || code == null || !localState.hasRemainingUses()) {
             running.finishWork();
             return;
         }
@@ -332,10 +357,12 @@ public final class Automation {
         }
         try {
             Method method = controller.getClass().getMethod(methodName, String.class);
+            promoResultGate.expectResult();
             method.invoke(controller, code);
             inFlight.set(false);
             running.scheduleAttempt(15_000L);
         } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException error) {
+            promoResultGate.cancel();
             inFlight.set(false);
             localState.setLastStatus("Could not invoke the logged-in promo-code API");
             running.scheduleAttempt(10_000L);
@@ -381,14 +408,15 @@ public final class Automation {
 
     private static void scheduleKnownExpiry() {
         AutomationState localState = requireState();
-        if (!localState.enabled() || localState.code() == null || !localState.hasRemainingUses()) return;
+        if (!localState.enabled() || !localState.isRepeatableTimeCode()
+                || localState.code() == null || !localState.hasRemainingUses()) return;
         long expiry = localState.currentExpiry();
         if (expiry > 0L) AlarmScheduler.schedule(requireContext(), expiry);
     }
 
     private static void resumeIfDue() {
         AutomationState localState = requireState();
-        if (!localState.enabled() || localState.code() == null) return;
+        if (!localState.enabled() || !localState.isRepeatableTimeCode() || localState.code() == null) return;
         long expiry = localState.currentExpiry();
         if (expiry > 0L && expiry <= System.currentTimeMillis() + 60_000L) {
             startService();

@@ -43,6 +43,15 @@ final class Strings {
                 "Код безопасно сохранён", "کوڈ محفوظ کر لیا گیا");
     }
 
+    static String singleCodeSaved() {
+        return pick("単発コードを保存しました。終端での自動再適用は行いません", "Single-use code saved; it will not be reapplied at expiry",
+                "已保存单次代码；到期时不会重复应用", "एकल-उपयोग कोड सहेजा गया; समाप्ति पर दोबारा लागू नहीं होगा",
+                "Código de un uso guardado; no se repetirá al vencer", "Code à usage unique enregistré ; il ne sera pas réappliqué à l’expiration",
+                "تم حفظ رمز الاستخدام الواحد؛ لن يعاد تطبيقه عند الانتهاء", "Código de uso único salvo; não será reaplicado no término",
+                "একবার ব্যবহারের কোড সংরক্ষিত; মেয়াদ শেষে আবার প্রয়োগ হবে না", "Одноразовый код сохранён; повторного применения не будет",
+                "یک بار استعمال کا کوڈ محفوظ؛ اختتام پر دوبارہ لاگو نہیں ہوگا");
+    }
+
     static String encryptionFailed() {
         return pick("コードを安全に保存できませんでした", "Could not store the code securely", "无法安全保存代码",
                 "कोड सुरक्षित रूप से सहेजा नहीं जा सका", "No se pudo guardar el código", "Impossible d’enregistrer le code",
@@ -104,12 +113,31 @@ final class Strings {
     static String expiryInputHint() { return pick("現在の終了日時（例: 2026-08-31 16:42）", "Current expiry (for example: 2026-08-31 16:42)", "当前结束时间（例如：2026-08-31 16:42）", "वर्तमान समाप्ति (उदा. 2026-08-31 16:42)", "Fin actual (ej.: 2026-08-31 16:42)", "Fin actuelle (ex. : 2026-08-31 16:42)", "وقت الانتهاء الحالي (مثال: 2026-08-31 16:42)", "Fim atual (ex.: 2026-08-31 16:42)", "বর্তমান শেষ সময় (যেমন: 2026-08-31 16:42)", "Текущее окончание (напр. 2026-08-31 16:42)", "موجودہ اختتام (مثال: 2026-08-31 16:42)"); }
     static String manualExpirySaved() { return pick("現在の終了日時を保存しました", "Current expiry saved", "当前结束时间已保存", "वर्तमान समाप्ति सहेजी गई", "Fin actual guardado", "Fin actuelle enregistrée", "تم حفظ وقت الانتهاء", "Fim atual salvo", "বর্তমান শেষ সময় সংরক্ষিত", "Текущее окончание сохранено", "موجودہ اختتام محفوظ ہو گیا"); }
     static String invalidExpiry() { return pick("未来の日時を YYYY-MM-DD HH:mm で入力してください", "Enter a future time as YYYY-MM-DD HH:mm", "请按 YYYY-MM-DD HH:mm 输入未来时间", "भविष्य का समय YYYY-MM-DD HH:mm में दें", "Introduce una hora futura como YYYY-MM-DD HH:mm", "Entrez une date future au format YYYY-MM-DD HH:mm", "أدخل وقتًا مستقبليًا بصيغة YYYY-MM-DD HH:mm", "Digite um horário futuro como YYYY-MM-DD HH:mm", "YYYY-MM-DD HH:mm আকারে ভবিষ্যৎ সময় দিন", "Введите будущее время как YYYY-MM-DD HH:mm", "مستقبل کا وقت YYYY-MM-DD HH:mm میں درج کریں"); }
-    static String maxUsesHint() { return pick("最大回数（通常24）", "Maximum uses (usually 24)", "最大次数（通常24）", "अधिकतम उपयोग (आमतौर पर 24)", "Usos máximos (normalmente 24)", "Utilisations maximales (24 en général)", "الحد الأقصى للاستخدام (عادة 24)", "Usos máximos (normalmente 24)", "সর্বোচ্চ ব্যবহার (সাধারণত ২৪)", "Максимум использований (обычно 24)", "زیادہ سے زیادہ استعمال (عموماً 24)"); }
-    static String currentUseHint() { return pick("現在利用中の回数（今回は4）", "Current active use (4 this time)", "当前使用次数（本次为4）", "वर्तमान सक्रिय उपयोग (इस बार 4)", "Uso activo actual (4 esta vez)", "Utilisation active actuelle (4 ici)", "رقم الاستخدام الحالي (4 هذه المرة)", "Uso ativo atual (4 desta vez)", "বর্তমান সক্রিয় ব্যবহার (এবার ৪)", "Текущее активное использование (сейчас 4)", "موجودہ فعال استعمال (اس بار 4)"); }
-    static String durationHoursHint() { return pick("1回の有効時間（時間、7日なら168）", "Duration per use in hours (168 for 7 days)", "每次有效小时数（7天为168）", "हर उपयोग की अवधि घंटे में (7 दिन के लिए 168)", "Horas por uso (168 para 7 días)", "Durée par utilisation en heures (168 pour 7 jours)", "مدة كل استخدام بالساعات (168 لسبعة أيام)", "Horas por uso (168 para 7 dias)", "প্রতি ব্যবহারের সময় ঘণ্টায় (৭ দিনে ১৬৮)", "Часов на одно использование (168 для 7 дней)", "فی استعمال گھنٹے (7 دن کے لیے 168)"); }
+    static String maxUsesHint() { return pick("コードの利用可能回数（メールから抽出）", "Code-use limit (extracted from email)", "代码可用次数（从邮件提取）", "कोड उपयोग सीमा (ईमेल से निकाली गई)", "Límite de usos del código (extraído del correo)", "Limite d’utilisation du code (extraite du courriel)", "حد استخدام الرمز (مستخرج من البريد)", "Limite de usos do código (extraído do e-mail)", "কোড ব্যবহারের সীমা (ইমেল থেকে নেওয়া)", "Лимит кода (из письма)", "کوڈ استعمال کی حد (ای میل سے اخذ شدہ)"); }
+    static String currentUseHint() { return pick("このコードの適用済み回数", "Uses already applied from this code", "此代码已使用次数", "इस कोड से पहले से लागू उपयोग", "Usos ya aplicados con este código", "Utilisations déjà appliquées avec ce code", "مرات استخدام هذا الرمز سابقًا", "Usos já aplicados deste código", "এই কোড থেকে ইতিমধ্যে প্রয়োগের সংখ্যা", "Уже применено этим кодом", "اس کوڈ سے پہلے لاگو شدہ تعداد"); }
+    static String durationHoursHint() { return pick("1回の有効時間（メールから抽出、時間単位）", "Duration per use (extracted from email, hours)", "每次有效时长（从邮件提取，小时）", "प्रति उपयोग अवधि (ईमेल से, घंटे)", "Duración por uso (extraída del correo, horas)", "Durée par utilisation (extraite du courriel, heures)", "مدة كل استخدام (من البريد، بالساعات)", "Duração por uso (extraída do e-mail, horas)", "প্রতি ব্যবহারের সময় (ইমেল থেকে, ঘণ্টা)", "Длительность одного использования (из письма, часы)", "فی استعمال مدت (ای میل سے، گھنٹے)"); }
     static String invalidUseProgress() { return pick("回数の大小関係と、1回の有効時間（1〜8760時間）を確認してください", "Check the use counts and duration (1–8760 hours)", "请检查次数和有效小时数（1至8760）", "उपयोग गिनती और अवधि (1–8760 घंटे) जाँचें", "Comprueba los usos y la duración (1–8760 horas)", "Vérifiez les compteurs et la durée (1–8760 heures)", "تحقق من العدد والمدة (1–8760 ساعة)", "Verifique as contagens e a duração (1–8760 horas)", "ব্যবহারের সংখ্যা ও সময় (১–৮৭৬০ ঘণ্টা) দেখুন", "Проверьте количество и длительность (1–8760 часов)", "تعداد اور مدت (1–8760 گھنٹے) چیک کریں"); }
     static String usesProgress(int current, int maximum) { return pick("利用回数 " + current + "/" + maximum, "Uses " + current + "/" + maximum, "使用次数 " + current + "/" + maximum, "उपयोग " + current + "/" + maximum, "Usos " + current + "/" + maximum, "Utilisations " + current + "/" + maximum, "الاستخدامات " + current + "/" + maximum, "Usos " + current + "/" + maximum, "ব্যবহার " + current + "/" + maximum, "Использования " + current + "/" + maximum, "استعمال " + current + "/" + maximum); }
     static String durationPerUse(int hours) { return pick("1回 " + hours + "時間", hours + " hours/use", "每次 " + hours + " 小时", "प्रति उपयोग " + hours + " घंटे", hours + " horas/uso", hours + " h/utilisation", hours + " ساعة/استخدام", hours + " horas/uso", "প্রতি ব্যবহার " + hours + " ঘণ্টা", hours + " ч/использование", hours + " گھنٹے/استعمال"); }
     static String successCount(int count) { return pick("自動適用成功 " + count + "回", "Automatic applications " + count, "自动应用成功 " + count + " 次", "स्वचालित सफलताएँ " + count, "Aplicaciones automáticas " + count, "Applications automatiques " + count, "مرات التطبيق التلقائي " + count, "Aplicações automáticas " + count, "স্বয়ংক্রিয় প্রয়োগ " + count, "Автоприменений " + count, "خودکار اطلاق " + count); }
     static String allUsesCompleted() { return pick("全回数の適用が完了しました", "All uses completed", "所有次数均已完成", "सभी उपयोग पूरे हुए", "Se completaron todos los usos", "Toutes les utilisations sont terminées", "اكتملت جميع الاستخدامات", "Todos os usos foram concluídos", "সব ব্যবহার সম্পন্ন", "Все использования завершены", "تمام استعمال مکمل ہو گئے"); }
+
+    static String productType(PromoProduct.Type type) {
+        if (type == PromoProduct.Type.REPEATABLE_TIME_CODE) {
+            return pick("商品種別: 時間制・反復コード", "Product: repeatable timed code", "商品：可重复计时代码",
+                    "उत्पाद: दोहराने योग्य समयबद्ध कोड", "Producto: código temporal repetible", "Produit : code temporisé répétable",
+                    "المنتج: رمز زمني قابل للتكرار", "Produto: código temporizado repetível", "পণ্য: পুনরাবৃত্ত সময়ভিত্তিক কোড",
+                    "Продукт: повторяемый код с периодом", "پروڈکٹ: دہرایا جانے والا وقتی کوڈ");
+        }
+        if (type == PromoProduct.Type.SINGLE_TIME_CODE) {
+            return pick("商品種別: 時間制・単発コード", "Product: single-use timed code", "商品：单次计时代码",
+                    "उत्पाद: एकल समयबद्ध कोड", "Producto: código temporal de un uso", "Produit : code temporisé à usage unique",
+                    "المنتج: رمز زمني لمرة واحدة", "Produto: código temporizado de uso único", "পণ্য: একবারের সময়ভিত্তিক কোড",
+                    "Продукт: одноразовый код с периодом", "پروڈکٹ: ایک بار وقتی کوڈ");
+        }
+        return pick("商品種別: 自動反復対象外", "Product: automatic repeat unavailable", "商品：不可自动重复",
+                "उत्पाद: स्वचालित दोहराव उपलब्ध नहीं", "Producto: repetición automática no disponible", "Produit : répétition automatique indisponible",
+                "المنتج: التكرار التلقائي غير متاح", "Produto: repetição automática indisponível", "পণ্য: স্বয়ংক্রিয় পুনরাবৃত্তি নেই",
+                "Продукт: автоповтор недоступен", "پروڈکٹ: خودکار تکرار دستیاب نہیں");
+    }
 }

@@ -14,6 +14,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
 final class AutomationState {
+    private static final int CURRENT_SCHEMA_VERSION = 2;
     private static final String PREFS = "povo_promo_automation";
     private static final String KEY_ALIAS = "povo_promo_automation_code";
     private static final String KEY_CODE = "encrypted_code";
@@ -26,19 +27,40 @@ final class AutomationState {
     private static final String KEY_DURATION_HOURS = "duration_hours";
     private static final String KEY_LAST_APPLIED = "last_applied_epoch_ms";
     private static final String KEY_LAST_STATUS = "last_status";
+    private static final String KEY_SCHEMA_VERSION = "schema_version";
+    private static final String KEY_PRODUCT_TYPE = "product_type";
+    private static final String KEY_PACKAGE_USES = "package_uses";
+    private static final String KEY_IMMEDIATE_USES = "immediate_uses";
 
     private final SharedPreferences preferences;
 
     AutomationState(Context context) {
         preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        migrateLegacyState();
     }
 
-    synchronized boolean saveCode(String code) {
+    synchronized boolean saveCode(String code, PromoProduct product) {
         try {
-            preferences.edit()
+            String previousCode = code();
+            boolean sameCode = code.equals(previousCode);
+            SharedPreferences.Editor editor = preferences.edit()
                     .putString(KEY_CODE, encrypt(code))
-                    .putBoolean(KEY_ENABLED, true)
-                    .apply();
+                    .putString(KEY_PRODUCT_TYPE, product.type.storageValue())
+                    .putInt(KEY_MAX_USES, product.codeUses)
+                    .putInt(KEY_DURATION_HOURS, product.durationHours)
+                    .putInt(KEY_PACKAGE_USES, product.packageUses)
+                    .putInt(KEY_IMMEDIATE_USES, product.immediateUses)
+                    .putBoolean(KEY_ENABLED, product.isRepeatableTimeCode());
+            if (!sameCode) {
+                editor.putInt(KEY_APPLIED_USES, 0)
+                        .putInt(KEY_SUCCESSES, 0)
+                        .putLong(KEY_LAST_APPLIED, 0L)
+                        .putLong(KEY_DEADLINE, 0L)
+                        .putLong(KEY_EXPIRY, 0L);
+            } else {
+                editor.putInt(KEY_APPLIED_USES, product.clampAppliedUses(appliedUses()));
+            }
+            editor.apply();
             return true;
         } catch (Exception ignored) {
             return false;
@@ -84,7 +106,7 @@ final class AutomationState {
     }
 
     int maxUses() {
-        return Math.max(1, preferences.getInt(KEY_MAX_USES, 24));
+        return Math.max(1, preferences.getInt(KEY_MAX_USES, 1));
     }
 
     int appliedUses() {
@@ -92,11 +114,11 @@ final class AutomationState {
     }
 
     boolean hasRemainingUses() {
-        return appliedUses() < maxUses();
+        return product().hasRemainingUses(appliedUses());
     }
 
     int durationHours() {
-        return Math.max(1, preferences.getInt(KEY_DURATION_HOURS, 168));
+        return Math.max(0, preferences.getInt(KEY_DURATION_HOURS, 0));
     }
 
     long durationMillis() {
@@ -104,23 +126,42 @@ final class AutomationState {
     }
 
     void setPlan(int maxUses, int appliedUses, int durationHours) {
+        PromoProduct current = product();
+        PromoProduct.Type type = maxUses > 1 && durationHours > 0
+                ? PromoProduct.Type.REPEATABLE_TIME_CODE
+                : PromoProduct.Type.SINGLE_TIME_CODE;
+        boolean sameProduct = current.codeUses == maxUses && current.durationHours == durationHours;
         preferences.edit()
+                .putString(KEY_PRODUCT_TYPE, type.storageValue())
                 .putInt(KEY_MAX_USES, maxUses)
                 .putInt(KEY_APPLIED_USES, appliedUses)
                 .putInt(KEY_DURATION_HOURS, durationHours)
+                .putInt(KEY_PACKAGE_USES, sameProduct ? current.packageUses : maxUses)
+                .putInt(KEY_IMMEDIATE_USES, sameProduct ? current.immediateUses : 0)
                 .apply();
-    }
-
-    void setDurationHours(int durationHours) {
-        preferences.edit().putInt(KEY_DURATION_HOURS, durationHours).apply();
     }
 
     void recordSuccess(long appliedAt) {
+        PromoProduct product = product();
         preferences.edit()
                 .putInt(KEY_SUCCESSES, successCount() + 1)
-                .putInt(KEY_APPLIED_USES, Math.min(maxUses(), appliedUses() + 1))
+                .putInt(KEY_APPLIED_USES, product.nextAppliedUses(appliedUses()))
                 .putLong(KEY_LAST_APPLIED, appliedAt)
                 .apply();
+    }
+
+    PromoProduct product() {
+        return new PromoProduct(
+                PromoProduct.Type.fromStorage(preferences.getString(KEY_PRODUCT_TYPE, null)),
+                durationHours(),
+                maxUses(),
+                Math.max(maxUses(), preferences.getInt(KEY_PACKAGE_USES, maxUses())),
+                Math.max(0, preferences.getInt(KEY_IMMEDIATE_USES, 0))
+        );
+    }
+
+    boolean isRepeatableTimeCode() {
+        return product().isRepeatableTimeCode();
     }
 
     long lastApplied() {
@@ -136,7 +177,33 @@ final class AutomationState {
     }
 
     void clear() {
-        preferences.edit().clear().apply();
+        preferences.edit().clear().putInt(KEY_SCHEMA_VERSION, CURRENT_SCHEMA_VERSION).apply();
+    }
+
+    private synchronized void migrateLegacyState() {
+        if (preferences.getInt(KEY_SCHEMA_VERSION, 0) >= CURRENT_SCHEMA_VERSION) return;
+
+        SharedPreferences.Editor editor = preferences.edit();
+        if (preferences.contains(KEY_CODE)) {
+            int maxUses = Math.max(1, preferences.getInt(KEY_MAX_USES, 24));
+            int appliedUses = Math.max(0, Math.min(preferences.getInt(KEY_APPLIED_USES, 0), maxUses));
+            int durationHours = Math.max(1, preferences.getInt(KEY_DURATION_HOURS, 168));
+            PromoProduct legacy = PromoProduct.legacyRepeatable(maxUses, durationHours);
+            editor.putString(KEY_PRODUCT_TYPE, legacy.type.storageValue())
+                    .putInt(KEY_MAX_USES, legacy.codeUses)
+                    .putInt(KEY_APPLIED_USES, appliedUses)
+                    .putInt(KEY_DURATION_HOURS, legacy.durationHours)
+                    .putInt(KEY_PACKAGE_USES, legacy.packageUses)
+                    .putInt(KEY_IMMEDIATE_USES, legacy.immediateUses);
+        } else {
+            editor.putString(KEY_PRODUCT_TYPE, PromoProduct.Type.UNKNOWN.storageValue())
+                    .putInt(KEY_MAX_USES, 1)
+                    .putInt(KEY_APPLIED_USES, 0)
+                    .putInt(KEY_DURATION_HOURS, 0)
+                    .putInt(KEY_PACKAGE_USES, 1)
+                    .putInt(KEY_IMMEDIATE_USES, 0);
+        }
+        editor.putInt(KEY_SCHEMA_VERSION, CURRENT_SCHEMA_VERSION).commit();
     }
 
     private String encrypt(String value) throws Exception {
