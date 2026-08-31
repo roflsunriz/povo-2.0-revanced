@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- pull request自動ラベル付けを現行Node.jsランタイムで継続するため、`actions/labeler`をv7へ更新した。
+
 ## [0.1.0] - 2026-08-31
 
 ### Added
