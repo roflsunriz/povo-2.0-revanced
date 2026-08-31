@@ -101,6 +101,8 @@ v0.1.1ではCIとReleaseを`build :patches:buildAndroid`へ変更した。修正
 
 同じManagerセッションで統合済みpovo 1.70.0-JP APKへ2パッチを適用し、準備・パッチ適用・APK書込・署名がすべて`2/2`で完了した。端末へ導入された`com.kddi.kdla.jp` 1.70.0-JP（857）に`AutomationBootReceiver`が登録されていることも確認した。再ログイン後の自動更新設定は未実施。
 
+remote source経路はManager 2.6.0と同じUser-Agentでraw `patches.json`を取得し、HTTP 200・version `0.1.1`を確認した。続く`download_url`もHTTP 200でAndroid RVPを返し、公開ReleaseのSHA-256と一致した。端末UIでのremote source追加はユーザーが他アプリを操作中だったため実行していない。
+
 ## 未実施の実機確認
 
 検証用別IDアプリはユーザー操作でアンインストール済みのため、次の項目は通常版の再導入後に確認する。
