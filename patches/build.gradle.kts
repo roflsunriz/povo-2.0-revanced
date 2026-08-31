@@ -11,3 +11,7 @@ patches {
         license = "GNU General Public License v3.0"
     }
 }
+
+dependencies {
+    implementation(libs.commons.lang3)
+}
