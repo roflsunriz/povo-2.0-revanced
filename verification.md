@@ -103,13 +103,29 @@ v0.1.1ではCIとReleaseを`build :patches:buildAndroid`へ変更した。修正
 
 remote source経路はManager 2.6.0と同じUser-Agentでraw `patches.json`を取得し、HTTP 200・version `0.1.1`を確認した。続く`download_url`もHTTP 200でAndroid RVPを返し、公開ReleaseのSHA-256と一致した。端末UIでのremote source追加はユーザーが他アプリを操作中だったため実行していない。
 
+## 16:42実終端の自動入力監視
+
+2026-08-31の通常版`com.kddi.kdla.jp`を対象に、現在の4回目終端16:42を監視した。結果は自動入力失敗だった。
+
+- 16:36:35: AQUOS R8 pro接続、正確なアラーム権限`allow`、16:37:00の`AutomationAlarmReceiver`予約を確認
+- 16:37:00: receiverから`AutomationService`が許可済みbackground foreground serviceとして起動
+- 16:42以降: 通知は「次のプロモコードを適用中」のまま継続
+- 16:56: foreground serviceは約19分間継続し、次回終端の`AutomationAlarmReceiver`予約は作成されなかった
+- 16:56頃: ユーザーが待機を中止して手動入力したため、それ以降は自動成功判定の対象外
+- `FATAL EXCEPTION`、プロモコード本文、token、個人情報のログ出力: 検出なし
+
+実装を再確認すると、`Automation.attempt()`は`promoController`が未解決の場合に2秒後の再試行を予約するだけで、`ensurePromoController()`による再解決を行わない。Activity再開前のbackground起動でcontrollerが未解決だと、serviceは起動していてもプロモコードAPI呼び出しへ進めない。この経路が今回の停止状態と一致する。
+
+ネットワーク側にも失敗要因があった。16:40から16:59までpovoプロセスで毎分`Unable to resolve host`が記録され、少なくとも一部のDNS通信が成立していなかった。端末のdefault networkはWi-Fiとして`VALIDATED`を維持しており、ConnectivityService上のdefault network切断は確認できなかったが、上流がトッピング終了後のpovo回線だった場合、128kbpsへの速度低下やDNS/TLS遅延がAPI適用を妨げた可能性がある。記録された名前解決失敗はpovoプロモコードAPIのhostではないため、ネットワークだけを原因と断定はできない。
+
+ユーザー観測ではDocomo回線経由なら操作が円滑だった。次回はcontroller再解決を修正した上で、Docomo回線またはpovo以外の独立Wi-Fiをdefault networkにして再試験し、アプリ内部要因とpovo回線終端時の通信要因を分離する。
+
 ## 未実施の実機確認
 
 検証用別IDアプリはユーザー操作でアンインストール済みのため、次の項目は通常版の再導入後に確認する。
 
-1. 現在の4回目終端（2026-08-31 16:42 JST）で、終了前 foreground service、拒否時再試行、5回目の適用成功、`5/24`、次回予約を時系列で確認する。
+1. controller再解決処理を修正後、Docomo回線またはpovo以外の独立Wi-Fiで、次の実終端またはコードを消費しない拒否条件によりbackground起動からAPI呼び出しへ進むことを確認する。
 2. 端末再起動後とセッション失効後に、コードを失わず復旧することを確認する。
-3. `adb logcat` にコード本文、token、個人情報が出力されないことを終端処理後にも確認する。
 
 ## 障害時の対策
 
