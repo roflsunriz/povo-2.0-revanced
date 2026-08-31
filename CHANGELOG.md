@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-08-31
+
+### Fixed
+
+- アプリ更新時に期限切れの旧アラームから起動したforeground serviceが、設定画面で将来の終了日時へ補正した後も長時間待機し続ける問題を修正した。
+- 手動終了日時の更新、自動更新の一時停止、利用回数完了時に、進行中の境界監視serviceとWakeLockを直ちに終了するようにした。
+- 終了12秒前まで5分を超えて残っている場合はforeground service内で待たず、正確なアラームへ戻してバッテリー消費を防ぐようにした。
+
 ## [0.1.2] - 2026-08-31
 
 ### Added
@@ -67,7 +75,8 @@
 
 - 長い入力による制御不能な再帰を防ぐため、ReVancedの推移依存で解決されていた脆弱な Apache Commons Lang 3.17.0 を、修正済みの3.20.0へ明示的に更新した（`GHSA-j288-q9x7-2f5v`）。
 
-[Unreleased]: https://github.com/roflsunriz/povo-2.0-revanced/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/roflsunriz/povo-2.0-revanced/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/roflsunriz/povo-2.0-revanced/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/roflsunriz/povo-2.0-revanced/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/roflsunriz/povo-2.0-revanced/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/roflsunriz/povo-2.0-revanced/releases/tag/v0.1.0

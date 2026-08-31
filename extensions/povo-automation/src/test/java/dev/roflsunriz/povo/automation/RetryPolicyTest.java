@@ -17,6 +17,20 @@ public final class RetryPolicyTest {
     }
 
     @Test
+    public void foregroundServiceWaitsOnlyInsideTheAlarmPreparationWindow() {
+        long now = 1_000_000L;
+
+        assertTrue(RetryPolicy.shouldWaitInForeground(
+                now,
+                now + RetryPolicy.MAX_FOREGROUND_WAIT_MS + RetryPolicy.PREWARM_LEAD_MS
+        ));
+        assertFalse(RetryPolicy.shouldWaitInForeground(
+                now,
+                now + RetryPolicy.MAX_FOREGROUND_WAIT_MS + RetryPolicy.PREWARM_LEAD_MS + 1L
+        ));
+    }
+
+    @Test
     public void retriesQuicklyAcrossBoundaryThenSlowsDown() {
         long expiry = 1_000_000L;
 

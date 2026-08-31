@@ -8,11 +8,16 @@ final class RetryPolicy {
     static final long REQUEST_WATCHDOG_MS = 60_000L;
     static final long GIVE_UP_AFTER_MS = 2L * 60L * 60L * 1000L;
     static final long WAKE_LOCK_TIMEOUT_MS = 20L * 60L * 1000L;
+    static final long MAX_FOREGROUND_WAIT_MS = 5L * 60L * 1000L;
 
     private RetryPolicy() {}
 
     static long firstAttemptDelay(long now, long expiry) {
         return Math.max(0L, expiry - PREWARM_LEAD_MS - now);
+    }
+
+    static boolean shouldWaitInForeground(long now, long expiry) {
+        return firstAttemptDelay(now, expiry) <= MAX_FOREGROUND_WAIT_MS;
     }
 
     static long retryDelay(long now, long expiry) {

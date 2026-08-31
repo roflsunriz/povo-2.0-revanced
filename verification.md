@@ -19,11 +19,13 @@
 | Gradle `build` | 成功 |
 | Android lint | エラー・警告なし |
 | Java/Kotlin コンパイル | 成功 |
-| PromoCodeExtractor・商品モデル・結果対応付け・再試行ポリシーのユニットテスト（12件） | 成功 |
+| PromoCodeExtractor・商品モデル・結果対応付け・再試行ポリシーのユニットテスト（13件） | 成功 |
 | RVP を ReVanced CLI 6.0.0 で列挙 | 成功 |
 | Gradle `:patches:buildAndroid` | 成功、RVPに`classes.dex`を同梱 |
 | `scripts/verify-android-rvp.ps1` | 成功、DEX・manifest・extensionを確認 |
-| ReVanced Manager 2.6.0へのローカルRVP追加 | 成功、`0.1.1`・2パッチを表示 |
+| actionlint 1.7.12 | 成功 |
+| OSV Scanner 2.5.1 | 解決済みGradle依存32件に既知脆弱性なし |
+| ReVanced Manager 2.6.0へのローカルRVP追加 | 成功、`0.1.3`・2パッチを表示 |
 | 1.68.0-JP base.apk へ適用 | 成功 |
 | 1.69.0-JP base.apk へ適用 | 成功 |
 | 1.70.0-JP base.apk へ適用 | 成功 |
@@ -37,6 +39,9 @@
 | 最大24・現在4・1回168時間の保存 | 成功 |
 | 正確なアラーム権限 | `allow` |
 | 16:37の正確な `RTC_WAKEUP` 予約 | 成功 |
+| v0.1.3通常版上書き後の設定保持 | 成功、`5/24`・168時間・次回2026-09-07 16:55・有効状態を維持 |
+| v0.1.3通常版上書き後のservice・WakeLock停止 | 成功、境界5分前まで常駐なし |
+| 2026-09-07 16:50の正確な `RTC_WAKEUP` 予約 | 成功、`window=0`・`exactAllowReason=permission` |
 | 旧スキーマから汎用商品モデルへの実機上書き移行 | 成功、コードを再入力せず `repeatable_time_code`・`4/24`・168時間・16:42・有効状態を維持 |
 | 最終検証APKの16 KiB alignment・v2/v3署名 | 成功 |
 | 初期化を `Application.super.onCreate()` 直後へ注入 | 実機ログで成功 |
@@ -134,13 +139,19 @@ v0.1.2では次の対策を追加した。
 
 再試行ポリシーは境界前開始、境界前後の高速再試行、10分後の減速、2時間後の停止をJVMユニットテストで固定した。実際の128kbps回線での完遂確認は2026-09-07 16:55終端の監視で行う。
 
-v0.1.2 Android RVPをpovo 1.70.0-JP統合APKへ適用し、「プロモコード自動更新」と「検証用別パッケージID」の両方が成功した。最終APKで`ACCESS_NETWORK_STATE`、`WAKE_LOCK`、`SCHEDULE_EXACT_ALARM`、別package ID、APK v2/v3署名、16KiB alignmentを確認した。通常版への上書きは端末がロック中だったため未実施。
+v0.1.2 Android RVPをpovo 1.70.0-JP統合APKへ適用し、「プロモコード自動更新」と「検証用別パッケージID」の両方が成功した。最終APKで`ACCESS_NETWORK_STATE`、`WAKE_LOCK`、`SCHEDULE_EXACT_ALARM`、別package ID、APK v2/v3署名、16KiB alignmentを確認した。
+
+通常版`com.kddi.kdla.jp`へReVanced Manager 2.6.0から上書きし、Playプロテクトのスキャン通過、アプリデータ・ログイン状態・暗号化済みコードの保持を確認した。手動適用済み分を反映して`5/24`、168時間、次回2026-09-07 16:55へ補正し、AlarmManagerに2026-09-07 16:50の`RTC_WAKEUP`が`window=0`、`exactAllowReason=permission`で登録された。
+
+この上書き回帰では、更新直後に期限切れの旧時刻を復元したserviceが起動し、新しい将来時刻の保存後もforeground serviceとWakeLockを保持する更新時限定の問題も検出した。サーバー応答はすべて拒否で適用回数は増加していない。v0.1.3では、手動時刻補正時の即時service終了と、5分を超える将来時刻をservice内で待たずAlarmManagerへ戻すガードを追加した。
+
+v0.1.3 Android RVPをReVanced Manager 2.6.0へローカル追加し、通常版1.70.0-JPへ1パッチだけを再適用した。Playプロテクトは「このアプリは安全です」と判定し、同じManager署名による上書き後もログイン状態、暗号化済みコード、`5/24`、168時間、次回2026-09-07 16:55を保持した。更新後とアプリ再起動後の両方で`AutomationService`と`povo-automation:boundary` WakeLockが存在しないこと、および2026-09-07 16:50の正確なアラームが維持されることを確認した。
 
 ## 未実施の実機確認
 
-検証用別IDアプリはユーザー操作でアンインストール済みのため、次の項目は通常版の再導入後に確認する。
+検証用別IDアプリはユーザー操作でアンインストール済みのため、次の項目を次回実終端で確認する。
 
-1. controller再解決処理を修正後、Docomo回線またはpovo以外の独立Wi-Fiで、次の実終端またはコードを消費しない拒否条件によりbackground起動からAPI呼び出しへ進むことを確認する。
+1. Docomo回線、povo以外の独立Wi-Fi、または128kbpsへ低下したpovo回線で、background起動からAPI呼び出しと成功判定まで進むことを確認する。
 2. 端末再起動後とセッション失効後に、コードを失わず復旧することを確認する。
 
 ## 障害時の対策

@@ -158,6 +158,7 @@ public final class Automation {
                 localState.setCurrentExpiry(parsed.getTime());
                 localState.setLastStatus(Strings.manualExpirySaved());
                 scheduleKnownExpiry();
+                finishService();
                 return true;
             } catch (ParseException ignored) {
                 // Try the next accepted local format.
@@ -171,7 +172,10 @@ public final class Automation {
         if (enabled && (!localState.isRepeatableTimeCode() || !localState.hasRemainingUses())) return;
         localState.setEnabled(enabled);
         if (enabled) scheduleKnownExpiry();
-        else AlarmScheduler.cancel(requireContext());
+        else {
+            AlarmScheduler.cancel(requireContext());
+            finishService();
+        }
     }
 
     public static boolean setUseProgress(String maxInput, String currentInput, String durationInput) {
@@ -189,6 +193,7 @@ public final class Automation {
                     localState.setLastStatus(Strings.allUsesCompleted());
                 }
                 AlarmScheduler.cancel(requireContext());
+                finishService();
             } else {
                 scheduleKnownExpiry();
             }
@@ -362,6 +367,11 @@ public final class Automation {
         }
         long untilAttempt = RetryPolicy.firstAttemptDelay(now, expiry);
         if (untilAttempt > 0L) {
+            if (!RetryPolicy.shouldWaitInForeground(now, expiry)) {
+                AlarmScheduler.schedule(requireContext(), expiry);
+                running.finishWork();
+                return;
+            }
             running.showProgress(Strings.foregroundTitle());
             running.scheduleAttempt(untilAttempt);
             return;
