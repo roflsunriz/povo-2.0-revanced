@@ -27,7 +27,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ORG_GRADLE_PROJECT_githubPackagesUsername: ${{ github.actor }}
           ORG_GRADLE_PROJECT_githubPackagesPassword: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew build
+        run: ./gradlew build :patches:buildAndroid
+
+      - name: Verify Android RVP
+        shell: pwsh
+        run: |
+          $bundles = @(Get-ChildItem patches/build/libs/patches-*.rvp | Where-Object { $_.Name -notmatch '(sources|javadoc)' })
+          if ($bundles.Count -ne 1) { throw "Expected one release RVP, found $($bundles.Count)" }
+          ./scripts/verify-android-rvp.ps1 -Path $bundles[0].FullName
 
       - name: Resolve development version
         id: version

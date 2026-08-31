@@ -45,7 +45,7 @@ $env:GITHUB_TOKEN = $revancedToken
 $env:GITHUB_ACTOR = $revancedActor
 $env:ORG_GRADLE_PROJECT_githubPackagesUsername = $revancedActor
 $env:ORG_GRADLE_PROJECT_githubPackagesPassword = $revancedToken
-./gradlew clean build
+./gradlew clean build :patches:buildAndroid
 ```
 
 ## 4. 複数世代へ適用する
@@ -56,6 +56,7 @@ $env:ORG_GRADLE_PROJECT_githubPackagesPassword = $revancedToken
 4. `patches/build/libs/patches-<version>.rvp` を各単体 APK へ適用する。
 5. 次を確認する。
    - パッチ成功
+   - `scripts/verify-android-rvp.ps1`による`classes.dex`同梱確認
    - extension DEX の存在
    - manifest コンポーネントと権限
    - native ABI
@@ -82,6 +83,7 @@ $env:ORG_GRADLE_PROJECT_githubPackagesPassword = $revancedToken
 `v<version>` タグを main の対象コミットへ付けて push する。release workflow は次を行う。
 
 - lint・テスト・RVP ビルド
+- `buildAndroid`によるAndroid用`classes.dex`のRVP同梱
 - `CHANGELOG.md` の該当バージョンだけを release 本文へ抽出
 - RVP を安定名 `povo-2.0-patches.rvp` として添付
 - Manager source metadata `patches.json` を添付

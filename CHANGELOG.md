@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-31
+
 ### Changed
 
 - pull request自動ラベル付けを現行Node.jsランタイムで継続するため、`actions/labeler`をv7へ更新した。
@@ -12,6 +14,7 @@
 ### Fixed
 
 - GitHub Release URLを`patches.json`の登録先として案内したため環境によって追加に失敗していた問題を修正し、Managerが直接取得できる`raw.githubusercontent.com`のsource URLを明記した。
+- ReVanced ManagerがRVPをDEXコンテナとして読み込めるように、CIとReleaseで`buildAndroid`を実行し、`classes.dex`を含むAndroid用RVPだけを配布するよう修正した。
 
 ## [0.1.0] - 2026-08-31
 
@@ -46,5 +49,6 @@
 
 - 長い入力による制御不能な再帰を防ぐため、ReVancedの推移依存で解決されていた脆弱な Apache Commons Lang 3.17.0 を、修正済みの3.20.0へ明示的に更新した（`GHSA-j288-q9x7-2f5v`）。
 
-[Unreleased]: https://github.com/roflsunriz/povo-2.0-revanced/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/roflsunriz/povo-2.0-revanced/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/roflsunriz/povo-2.0-revanced/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/roflsunriz/povo-2.0-revanced/releases/tag/v0.1.0

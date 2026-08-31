@@ -195,10 +195,10 @@ Android の電源管理、圏外、povo 側障害、認証失効があるため�
 JDK 21、Android SDK、GitHub Packages を読める GitHub token が必要です。
 
 ```powershell
-./gradlew build
+./gradlew build :patches:buildAndroid
 ```
 
-成果物は `patches/build/libs/patches-<version>.rvp` です。認証情報をファイルへコミットしないでください。
+成果物は`patches/build/libs/patches-<version>.rvp`です。`buildAndroid`を省略するとManagerが読み込めるDEXが入らないため、通常の`build`だけで作ったRVPを配布しないでください。認証情報をファイルへコミットしないでください。
 
 ## ライセンス
 

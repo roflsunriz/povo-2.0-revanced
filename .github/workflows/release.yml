@@ -40,7 +40,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ORG_GRADLE_PROJECT_githubPackagesUsername: ${{ github.actor }}
           ORG_GRADLE_PROJECT_githubPackagesPassword: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew clean build
+        run: ./gradlew clean build :patches:buildAndroid
 
       - name: Prepare release assets and notes
         shell: pwsh
@@ -49,6 +49,7 @@ jobs:
           $bundles = @(Get-ChildItem patches/build/libs/patches-*.rvp | Where-Object { $_.Name -notmatch '(sources|javadoc)' })
           if ($bundles.Count -ne 1) { throw "Expected one release RVP, found $($bundles.Count)" }
           $bundle = $bundles[0]
+          ./scripts/verify-android-rvp.ps1 -Path $bundle.FullName
           Copy-Item -LiteralPath $bundle.FullName -Destination dist/povo-2.0-patches.rvp
           ./scripts/generate-patches-json.ps1 -Version '${{ steps.version.outputs.version }}' -OutputPath dist/patches.json
           ./scripts/extract-changelog.ps1 -Version '${{ steps.version.outputs.version }}' -OutputPath dist/release-notes.md

@@ -21,6 +21,9 @@
 | Java/Kotlin コンパイル | 成功 |
 | PromoCodeExtractor・商品モデル・結果対応付けユニットテスト（9件） | 成功 |
 | RVP を ReVanced CLI 6.0.0 で列挙 | 成功 |
+| Gradle `:patches:buildAndroid` | 成功、RVPに`classes.dex`を同梱 |
+| `scripts/verify-android-rvp.ps1` | 成功、DEX・manifest・extensionを確認 |
+| ReVanced Manager 2.6.0へのローカルRVP追加 | 成功、`0.1.1`・2パッチを表示 |
 | 1.68.0-JP base.apk へ適用 | 成功 |
 | 1.69.0-JP base.apk へ適用 | 成功 |
 | 1.70.0-JP base.apk へ適用 | 成功 |
@@ -85,9 +88,20 @@
 - APK: 既存版と署名証明書一致、APK Signature Scheme v2/v3有効、16 KiB alignment正常
 - 起動後: FATAL EXCEPTIONなし
 
-## 継続中の実機確認
+## ReVanced Manager互換性
 
-検証用IDへのログイン後、次の項目を継続確認する。
+v0.1.0で公開したRVPは通常のGradle `build`だけで生成され、JVM用`.class`は含むがAndroid用`classes.dex`を含んでいなかった。ReVanced CLIでは列挙できた一方、ReVanced Manager 2.6.0では`EmptyMultiDexContainerException`になり、URL追加とローカル追加の両方で読み込めなかった。
+
+v0.1.1ではCIとReleaseを`build :patches:buildAndroid`へ変更した。修正版RVPをAQUOS R8 proのDownloadへ転送し、公開予定ファイルと端末上ファイルのSHA-256一致を確認後、Managerの「Patches」→「ストレージから選択」で追加した。UI階層で次を確認した。
+
+- bundle名: `povo 2.0 automation patches`
+- version: `0.1.1`
+- パッチ数: 2
+- `EmptyMultiDexContainerException`およびbundle load失敗: なし
+
+## 未実施の実機確認
+
+検証用別IDアプリはユーザー操作でアンインストール済みのため、次の項目は通常版の再導入後に確認する。
 
 1. 現在の4回目終端（2026-08-31 16:42 JST）で、終了前 foreground service、拒否時再試行、5回目の適用成功、`5/24`、次回予約を時系列で確認する。
 2. 端末再起動後とセッション失効後に、コードを失わず復旧することを確認する。
