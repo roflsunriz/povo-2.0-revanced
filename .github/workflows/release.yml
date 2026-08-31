@@ -53,7 +53,7 @@ jobs:
           ./scripts/generate-patches-json.ps1 -Version '${{ steps.version.outputs.version }}' -OutputPath dist/patches.json
           ./scripts/extract-changelog.ps1 -Version '${{ steps.version.outputs.version }}' -OutputPath dist/release-notes.md
 
-      - uses: actions/attest-build-provenance@v3
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             dist/povo-2.0-patches.rvp
