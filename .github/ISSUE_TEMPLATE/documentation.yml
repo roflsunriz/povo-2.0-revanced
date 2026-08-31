@@ -1,0 +1,17 @@
+name: ドキュメント
+description: 手順や説明の不足・誤りを報告します
+title: "[Docs]: "
+labels: [documentation]
+body:
+  - type: textarea
+    id: location
+    attributes:
+      label: 対象箇所
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 問題と提案
+    validations:
+      required: true

@@ -1,0 +1,37 @@
+name: バグ報告
+description: パッチ適用または実行時の不具合を報告します
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: input
+    id: app-version
+    attributes:
+      label: povo 2.0 バージョン
+      placeholder: 1.70.0-JP (857)
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: 端末と Android バージョン
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: 期待結果と実際の結果
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 秘密情報
+      options:
+        - label: プロモコード、token、メール本文、電話番号を除去しました
+          required: true

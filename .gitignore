@@ -1,2 +1,21 @@
 COMMON-AGENTS.md
 povo-2.0-apks/
+
+# Gradle / IDE
+.gradle/
+**/build/
+.idea/
+*.iml
+local.properties
+
+# Local credentials and temporary verification artifacts
+gradle.properties.local
+*.apk
+*.apkm
+*.keystore
+*.jks
+verification-output/
+
+# Dependencies and generated release files
+node_modules/
+*.log

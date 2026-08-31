@@ -1,0 +1,50 @@
+name: Build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build and test
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG_GRADLE_PROJECT_githubPackagesUsername: ${{ github.actor }}
+          ORG_GRADLE_PROJECT_githubPackagesPassword: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew build
+
+      - name: Resolve development version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Select-String -LiteralPath gradle.properties -Pattern '^version\s*=\s*(.+)$').Matches[0].Groups[1].Value.Trim()
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Generate Manager source metadata
+        shell: pwsh
+        run: ./scripts/generate-patches-json.ps1 -Version "${{ steps.version.outputs.version }}" -OutputPath "dist/patches.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: patches
+          path: |
+            patches/build/libs/patches-*.rvp
+            !patches/build/libs/patches-*-sources.rvp
+            !patches/build/libs/patches-*-javadoc.rvp
+            dist/patches.json

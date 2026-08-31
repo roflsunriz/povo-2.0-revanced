@@ -1,0 +1,15 @@
+title: "[Idea] "
+labels: []
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: 解決したいこと
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: アイデア
+    validations:
+      required: true

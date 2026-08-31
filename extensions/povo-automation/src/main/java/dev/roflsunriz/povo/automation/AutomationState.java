@@ -1,0 +1,146 @@
+package dev.roflsunriz.povo.automation;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
+import android.util.Base64;
+
+import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+
+final class AutomationState {
+    private static final String PREFS = "povo_promo_automation";
+    private static final String KEY_ALIAS = "povo_promo_automation_code";
+    private static final String KEY_CODE = "encrypted_code";
+    private static final String KEY_ENABLED = "enabled";
+    private static final String KEY_DEADLINE = "deadline_epoch_ms";
+    private static final String KEY_EXPIRY = "current_expiry_epoch_ms";
+    private static final String KEY_SUCCESSES = "success_count";
+    private static final String KEY_LAST_APPLIED = "last_applied_epoch_ms";
+    private static final String KEY_LAST_STATUS = "last_status";
+
+    private final SharedPreferences preferences;
+
+    AutomationState(Context context) {
+        preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    }
+
+    synchronized boolean saveCode(String code) {
+        try {
+            preferences.edit()
+                    .putString(KEY_CODE, encrypt(code))
+                    .putBoolean(KEY_ENABLED, true)
+                    .apply();
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    synchronized String code() {
+        String encrypted = preferences.getString(KEY_CODE, null);
+        if (encrypted == null) return null;
+        try {
+            return decrypt(encrypted);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    boolean enabled() {
+        return preferences.getBoolean(KEY_ENABLED, false);
+    }
+
+    void setEnabled(boolean enabled) {
+        preferences.edit().putBoolean(KEY_ENABLED, enabled).apply();
+    }
+
+    long deadline() {
+        return preferences.getLong(KEY_DEADLINE, 0L);
+    }
+
+    void setDeadline(long deadline) {
+        preferences.edit().putLong(KEY_DEADLINE, deadline).apply();
+    }
+
+    long currentExpiry() {
+        return preferences.getLong(KEY_EXPIRY, 0L);
+    }
+
+    void setCurrentExpiry(long expiry) {
+        preferences.edit().putLong(KEY_EXPIRY, expiry).apply();
+    }
+
+    int successCount() {
+        return preferences.getInt(KEY_SUCCESSES, 0);
+    }
+
+    void recordSuccess(long appliedAt) {
+        preferences.edit()
+                .putInt(KEY_SUCCESSES, successCount() + 1)
+                .putLong(KEY_LAST_APPLIED, appliedAt)
+                .apply();
+    }
+
+    long lastApplied() {
+        return preferences.getLong(KEY_LAST_APPLIED, 0L);
+    }
+
+    String lastStatus() {
+        return preferences.getString(KEY_LAST_STATUS, "");
+    }
+
+    void setLastStatus(String status) {
+        preferences.edit().putString(KEY_LAST_STATUS, status).apply();
+    }
+
+    void clear() {
+        preferences.edit().clear().apply();
+    }
+
+    private String encrypt(String value) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.ENCRYPT_MODE, key());
+        byte[] encrypted = cipher.doFinal(value.getBytes(StandardCharsets.UTF_8));
+        byte[] result = new byte[cipher.getIV().length + encrypted.length];
+        System.arraycopy(cipher.getIV(), 0, result, 0, cipher.getIV().length);
+        System.arraycopy(encrypted, 0, result, cipher.getIV().length, encrypted.length);
+        return Base64.encodeToString(result, Base64.NO_WRAP);
+    }
+
+    private String decrypt(String value) throws Exception {
+        byte[] bytes = Base64.decode(value, Base64.NO_WRAP);
+        if (bytes.length <= 12) throw new IllegalArgumentException("Invalid encrypted code");
+        byte[] iv = new byte[12];
+        byte[] encrypted = new byte[bytes.length - 12];
+        System.arraycopy(bytes, 0, iv, 0, iv.length);
+        System.arraycopy(bytes, iv.length, encrypted, 0, encrypted.length);
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.DECRYPT_MODE, key(), new GCMParameterSpec(128, iv));
+        return new String(cipher.doFinal(encrypted), StandardCharsets.UTF_8);
+    }
+
+    private SecretKey key() throws Exception {
+        KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+        keyStore.load(null);
+        SecretKey existing = (SecretKey) keyStore.getKey(KEY_ALIAS, null);
+        if (existing != null) return existing;
+
+        KeyGenerator generator = KeyGenerator.getInstance(
+                KeyProperties.KEY_ALGORITHM_AES,
+                "AndroidKeyStore"
+        );
+        generator.init(new KeyGenParameterSpec.Builder(
+                KEY_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT
+        ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .build());
+        return generator.generateKey();
+    }
+}

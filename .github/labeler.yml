@@ -1,0 +1,18 @@
+patch:
+  - changed-files:
+      - any-glob-to-any-file:
+          - patches/**
+          - extensions/**
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "*.md"
+          - docs/**
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
+          - gradle/**
+          - "*.gradle.kts"

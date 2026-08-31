@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: セキュリティ報告
+    url: https://github.com/roflsunriz/povo-2.0-revanced/security/advisories/new
+    about: 公開 issue へ秘密情報を書かず、非公開で報告してください
