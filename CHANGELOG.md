@@ -7,6 +7,11 @@
 ### Changed
 
 - pull request自動ラベル付けを現行Node.jsランタイムで継続するため、`actions/labeler`をv7へ更新した。
+- 初めて利用する人がManagerの入力欄やファイル形式で迷わないように、READMEをraw URL、ローカルRVP、APKM統合、通常版インストール、初回設定、トラブル対応の利用順へ再構成した。
+
+### Fixed
+
+- GitHub Release URLを`patches.json`の登録先として案内したため環境によって追加に失敗していた問題を修正し、Managerが直接取得できる`raw.githubusercontent.com`のsource URLを明記した。
 
 ## [0.1.0] - 2026-08-31
 

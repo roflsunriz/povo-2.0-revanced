@@ -75,6 +75,7 @@ $env:ORG_GRADLE_PROJECT_githubPackagesPassword = $revancedToken
 2. `CHANGELOG.md` の `[Unreleased]` から同じバージョンの節を作る。
 3. README、`patches.json`、この手順、検証記録の更新要否を確認する。
 4. `scripts/generate-patches-json.ps1` で Manager source metadata を生成し、JSON と RVP の版を一致させる。
+5. Managerへ登録するraw URL（`https://raw.githubusercontent.com/roflsunriz/povo-2.0-revanced/main/patches.json`）がJSONを返し、その`download_url`から最新RVPを取得できることを確認する。
 
 ## 6. リリースする
 
@@ -86,7 +87,7 @@ $env:ORG_GRADLE_PROJECT_githubPackagesPassword = $revancedToken
 - Manager source metadata `patches.json` を添付
 - build provenance を生成
 
-公開後、ReVanced Manager へ `patches.json` の release URL を追加し、実際に RVP の取得・パッチ選択・適用まで確認する。
+公開後、ReVanced ManagerへGitHub ReleaseのURLを直接登録しない。README記載のraw URLからremote sourceを追加する経路と、公開RVPを「Select from storage」で追加する経路の両方で、パッチ列挙まで確認する。
 
 ## ロールバック
 
