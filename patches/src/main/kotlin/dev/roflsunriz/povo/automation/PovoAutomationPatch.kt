@@ -27,6 +27,7 @@ private val automationManifestPatch = resourcePatch(
         document("AndroidManifest.xml").use { document ->
             listOf(
                 "android.permission.RECEIVE_BOOT_COMPLETED",
+                "android.permission.INTERNET",
                 "android.permission.SCHEDULE_EXACT_ALARM",
                 "android.permission.ACCESS_NETWORK_STATE",
                 "android.permission.WAKE_LOCK",
@@ -35,6 +36,15 @@ private val automationManifestPatch = resourcePatch(
             ).forEach(document::addPermission)
 
             val application = document.getElementsByTagName("application").item(0) as Element
+            application.addComponent(
+                document,
+                "service",
+                "dev.roflsunriz.povo.automation.DisplaySyncJob",
+                mapOf(
+                    "exported" to "false",
+                    "permission" to "android.permission.BIND_JOB_SERVICE",
+                ),
+            )
             application.addComponent(
                 document,
                 "activity",

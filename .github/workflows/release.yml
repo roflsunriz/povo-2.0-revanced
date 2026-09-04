@@ -25,6 +25,9 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
+      - name: Test CYD relay API
+        run: python3 -B -m unittest relay.test_relay -v
+
       - name: Resolve release version
         id: version
         shell: pwsh

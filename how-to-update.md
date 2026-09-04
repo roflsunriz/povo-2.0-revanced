@@ -51,6 +51,8 @@ $env:ORG_GRADLE_PROJECT_githubPackagesPassword = $revancedToken
 
 ## 4. 複数世代へ適用する
 
+CYD用中継APIを変更した場合は `python -B -m unittest relay.test_relay -v` も実行する。中継の起動・HTTPS・DBバックアップと復旧は `relay/README.md` に従う。API v1のフィールド名・型・認証を変更する場合はAndroid送信側とCYDの読み取り側の互換性を確認する。状態保存スキーマ3への移行では既存のコード・回数・期限を保持し、過去の期限取得元を `unknown` とする。
+
 1. APKEditor の公式 release asset と SHA-256 を確認する。
 2. 各 APKM を一時領域で単体 APK へ統合する。
 3. ReVanced CLI の公式 release asset と SHA-256 を確認する。

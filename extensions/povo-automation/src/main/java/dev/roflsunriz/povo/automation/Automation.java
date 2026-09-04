@@ -49,6 +49,8 @@ public final class Automation {
         if (application != null) return;
         application = app;
         state = new AutomationState(app);
+        state.resetTransientRenewalState();
+        DisplaySync.initialize(app);
         Notifications.createChannel(app);
         app.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
             @Override public void onActivityCreated(Activity activity, Bundle bundle) {}
@@ -155,7 +157,7 @@ public final class Automation {
                 Date parsed = format.parse(input.trim());
                 if (parsed == null || parsed.getTime() <= System.currentTimeMillis()) return false;
                 AutomationState localState = requireState();
-                localState.setCurrentExpiry(parsed.getTime());
+                localState.setCurrentExpiry(parsed.getTime(), "manual");
                 localState.setLastStatus(Strings.manualExpirySaved());
                 scheduleKnownExpiry();
                 finishService();
@@ -171,6 +173,7 @@ public final class Automation {
         AutomationState localState = requireState();
         if (enabled && (!localState.isRepeatableTimeCode() || !localState.hasRemainingUses())) return;
         localState.setEnabled(enabled);
+        localState.setRenewalState("idle");
         if (enabled) scheduleKnownExpiry();
         else {
             AlarmScheduler.cancel(requireContext());
@@ -190,6 +193,7 @@ public final class Automation {
             if (!localState.isRepeatableTimeCode() || !localState.hasRemainingUses()) {
                 localState.setEnabled(false);
                 if (localState.appliedUses() >= localState.maxUses()) {
+                    localState.setRenewalState("completed");
                     localState.setLastStatus(Strings.allUsesCompleted());
                 }
                 AlarmScheduler.cancel(requireContext());
@@ -270,8 +274,8 @@ public final class Automation {
         if (expiry < now - 5L * 60L * 1000L) return;
 
         long previous = localState.currentExpiry();
-        if (previous > now && previous <= expiry) return;
-        localState.setCurrentExpiry(expiry);
+        if (previous > now && previous < expiry && !"estimated".equals(localState.expirySource())) return;
+        localState.setCurrentExpiry(expiry, "server");
         localState.setLastStatus(Strings.toppingDetected(localState.durationHours()));
         Log.i("povo-automation", "Detected a configured topping window");
         scheduleKnownExpiry();
@@ -289,7 +293,10 @@ public final class Automation {
             Log.i("povo-automation", "Promo application accepted");
             long now = System.currentTimeMillis();
             localState.recordSuccess(now);
+            long nextExpiry = Math.max(now, localState.currentExpiry()) + localState.durationMillis();
+            localState.setCurrentExpiry(nextExpiry, "estimated");
             if (!localState.isRepeatableTimeCode() || !localState.hasRemainingUses()) {
+                localState.setRenewalState("completed");
                 localState.setEnabled(false);
                 localState.setLastStatus(Strings.allUsesCompleted());
                 AlarmScheduler.cancel(requireContext());
@@ -297,8 +304,7 @@ public final class Automation {
                 finishService();
                 return;
             }
-            long nextExpiry = Math.max(now, localState.currentExpiry()) + localState.durationMillis();
-            localState.setCurrentExpiry(nextExpiry);
+            localState.setRenewalState("idle");
             localState.setLastStatus(Strings.success());
             AlarmScheduler.schedule(requireContext(), nextExpiry);
             Notifications.status(requireContext(), Strings.settingsTitle(), Strings.success());
@@ -315,6 +321,7 @@ public final class Automation {
         int httpCode = ReflectionUtils.invokeInt(exception, "getHttpCode", -1);
         Log.i("povo-automation", "Promo application not accepted; http=" + httpCode);
         if (httpCode == 401 || httpCode == 403) {
+            localState.setRenewalState("auth_required");
             localState.setLastStatus(Strings.authRequired());
             Notifications.status(requireContext(), Strings.settingsTitle(), Strings.authRequired());
             finishService();
@@ -324,6 +331,7 @@ public final class Automation {
     }
 
     static void restoreSchedule(Context context) {
+        DisplaySync.schedule(context);
         AutomationState restored = new AutomationState(context);
         if (restored.enabled() && restored.isRepeatableTimeCode()
                 && restored.code() != null && restored.currentExpiry() > 0L) {
@@ -337,6 +345,7 @@ public final class Automation {
 
     static void onServiceStopped(AutomationService stopped) {
         if (service == stopped) service = null;
+        requireState().resetTransientRenewalState();
         inFlight.set(false);
         attemptStartedAt.set(0L);
         promoResultGate.cancel();
@@ -354,6 +363,7 @@ public final class Automation {
         }
         long now = System.currentTimeMillis();
         if (localState.deadline() > 0L && now > localState.deadline()) {
+            localState.setRenewalState("code_expired");
             localState.setEnabled(false);
             localState.setLastStatus("The prepaid-code deadline has passed");
             running.finishWork();
@@ -393,6 +403,7 @@ public final class Automation {
         if (!ensurePromoController()) {
             inFlight.set(false);
             if (RetryPolicy.shouldGiveUp(now, expiry)) {
+                localState.setRenewalState("needs_review");
                 localState.setLastStatus("Automatic application needs review");
                 Notifications.status(requireContext(), Strings.settingsTitle(), localState.lastStatus());
                 running.finishWork();
@@ -404,6 +415,7 @@ public final class Automation {
 
         int networkState = activeInternetState();
         if (networkState == 0) {
+            localState.setRenewalState("retrying");
             inFlight.set(false);
             Log.w("povo-automation", "No active internet network; retrying");
             running.scheduleAttempt(RetryPolicy.NETWORK_RETRY_MS);
@@ -418,6 +430,7 @@ public final class Automation {
             return;
         }
         try {
+            localState.setRenewalState("applying");
             Method method = controller.getClass().getMethod(methodName, String.class);
             promoResultGate.expectResult();
             attemptStartedAt.set(now);
@@ -428,6 +441,7 @@ public final class Automation {
                 running.scheduleAttempt(RetryPolicy.REQUEST_WATCHDOG_MS);
             }
         } catch (ReflectiveOperationException | RuntimeException error) {
+            localState.setRenewalState("retrying");
             promoResultGate.cancel();
             inFlight.set(false);
             attemptStartedAt.set(0L);
@@ -457,12 +471,14 @@ public final class Automation {
         long expiry = localState.currentExpiry();
         AutomationService running = service;
         if (RetryPolicy.shouldGiveUp(now, expiry)) {
+            localState.setRenewalState("needs_review");
             localState.setLastStatus("Automatic application needs review");
             Notifications.status(requireContext(), Strings.settingsTitle(), localState.lastStatus());
             finishService();
             return;
         }
         if (running != null) {
+            localState.setRenewalState("retrying");
             running.scheduleAttempt(RetryPolicy.retryDelay(now, expiry));
         }
     }

@@ -19,3 +19,5 @@ verification-output/
 # Dependencies and generated release files
 node_modules/
 *.log
+
+subagents/

@@ -128,6 +128,7 @@ public final class AutomationSettingsActivity extends Activity {
                 .setPositiveButton(android.R.string.ok, (dialog, which) -> {
                     AlarmScheduler.cancel(this);
                     Automation.requireState().clear();
+                    DisplaySync.schedule(this);
                     input.setText("");
                     expiryInput.setText("");
                     maxUsesInput.setText("1");
@@ -137,6 +138,7 @@ public final class AutomationSettingsActivity extends Activity {
                 })
                 .show());
 
+        DisplaySettings.attach(this, root);
         setContentView(scrollView);
         refresh();
     }

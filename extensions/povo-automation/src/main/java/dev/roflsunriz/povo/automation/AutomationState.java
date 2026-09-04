@@ -14,7 +14,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
 final class AutomationState {
-    private static final int CURRENT_SCHEMA_VERSION = 2;
+    private static final int CURRENT_SCHEMA_VERSION = 3;
     private static final String PREFS = "povo_promo_automation";
     private static final String KEY_ALIAS = "povo_promo_automation_code";
     private static final String KEY_CODE = "encrypted_code";
@@ -56,7 +56,10 @@ final class AutomationState {
                         .putInt(KEY_SUCCESSES, 0)
                         .putLong(KEY_LAST_APPLIED, 0L)
                         .putLong(KEY_DEADLINE, 0L)
-                        .putLong(KEY_EXPIRY, 0L);
+                        .putLong(KEY_EXPIRY, 0L)
+                        .putString("expiry_source", "unknown")
+                        .putLong("expiry_observed_at", 0L)
+                        .putString("renewal_state", "idle");
             } else {
                 editor.putInt(KEY_APPLIED_USES, product.clampAppliedUses(appliedUses()));
             }
@@ -97,8 +100,55 @@ final class AutomationState {
         return preferences.getLong(KEY_EXPIRY, 0L);
     }
 
-    void setCurrentExpiry(long expiry) {
-        preferences.edit().putLong(KEY_EXPIRY, expiry).apply();
+    void setCurrentExpiry(long expiry, String source) {
+        preferences.edit().putLong(KEY_EXPIRY, expiry)
+                .putString("expiry_source", source)
+                .putLong("expiry_observed_at", System.currentTimeMillis()).apply();
+    }
+
+    String expirySource() { return preferences.getString("expiry_source", "unknown"); }
+    long expiryObservedAt() { return preferences.getLong("expiry_observed_at", 0); }
+    String renewalState() { return preferences.getString("renewal_state", "unknown"); }
+    void setRenewalState(String value) { preferences.edit().putString("renewal_state", value).apply(); }
+
+    boolean displayEnabled() { return preferences.getBoolean("display_enabled", false); }
+    String displayEndpoint() { return preferences.getString("display_endpoint", ""); }
+    String displayToken() {
+        try {
+            String value = preferences.getString("display_token", null);
+            return value == null ? null : decrypt(value);
+        } catch (Exception error) { return null; }
+    }
+
+    String[] displayConnection() {
+        java.util.Map<String, ?> snapshot = preferences.getAll();
+        if (!Boolean.TRUE.equals(snapshot.get("display_enabled"))) return null;
+        try {
+            return new String[]{(String) snapshot.get("display_endpoint"),
+                    decrypt((String) snapshot.get("display_token"))};
+        } catch (Exception error) { throw new IllegalStateException("Display credential unavailable"); }
+    }
+
+    void resetTransientRenewalState() {
+        if ("applying".equals(renewalState()) || "retrying".equals(renewalState())) {
+            setRenewalState("needs_review");
+        }
+    }
+
+    boolean configureDisplay(String endpoint, String token) {
+        try {
+            String validated = DisplayEndpoint.validate(endpoint);
+            String credential = token.isEmpty() ? displayToken() : token;
+            if (!DisplayEndpoint.validToken(credential)) return false;
+            return preferences.edit().putString("display_endpoint", validated)
+                    .putString("display_token", encrypt(credential))
+                    .putBoolean("display_enabled", true).commit();
+        } catch (Exception error) { return false; }
+    }
+
+    void disableDisplay() {
+        preferences.edit().putBoolean("display_enabled", false)
+                .remove("display_token").remove("display_endpoint").apply();
     }
 
     int successCount() {
@@ -182,6 +232,14 @@ final class AutomationState {
 
     private synchronized void migrateLegacyState() {
         if (preferences.getInt(KEY_SCHEMA_VERSION, 0) >= CURRENT_SCHEMA_VERSION) return;
+
+        if (preferences.getInt(KEY_SCHEMA_VERSION, 0) == 2) {
+            preferences.edit().putString("expiry_source", "unknown")
+                    .putLong("expiry_observed_at", 0L)
+                    .putString("renewal_state", "unknown")
+                    .putInt(KEY_SCHEMA_VERSION, CURRENT_SCHEMA_VERSION).commit();
+            return;
+        }
 
         SharedPreferences.Editor editor = preferences.edit();
         if (preferences.contains(KEY_CODE)) {

@@ -165,3 +165,12 @@ v0.1.3 Android RVPをReVanced Manager 2.6.0へローカル追加し、通常版1
 ## 中間生成物
 
 APKM 展開物、統合 APK、パッチ済み APK、検証用 keystore、CLI、APKEditor は OS の一時領域だけに作成する。リポジトリ内の `povo-2.0-apks` に APKEditor が作る `tmp_*` が残っていないことを検証後に確認する。
+# 2026-09-05: CYD用状態中継API
+
+- `gradlew build :patches:buildAndroid`: 成功。Android単体テスト16件（うちHTTPS送信先・トークン検証3件）、lintエラー0。警告は既存の依存表記、同期的マイグレーション保存、および拡張モジュールのアイコン未指定。拡張はホストpovoのアイコンを使うため独立アプリアイコンを追加しない。
+- `python -B -m unittest relay.test_relay -q`: 10件成功。実HTTPの読み書き認証分離、不正入力拒否、保存・再起動・古い送信拒否、残り秒数・鮮度境界、DB退避復旧を確認。HTTPSは一時localhost SAN証明書を明示信頼してPUT/GETし、未信頼証明書の拒否も確認した。テスト用証明書と秘密鍵は削除済み。
+- 公式配布のReVanced CLI 6.0.0とAPKEditor 1.4.9を使用し、保存済みAPKM 1.68.0、1.69.0、1.70.0を統合してパッチ適用成功。各APKのmanifestでDisplaySyncJobとBIND_JOB_SERVICEを確認。最終RVPのclasses.dex・extension同梱も確認した。
+- 送信処理の監査で、メインスレッドとネットワークの共通ロック、設定変更時に旧トークンと新URLが混在する競合、停止済みjobへの完了通知、再起動後に残る更新中状態を修正した。
+- 既存v0.1.0〜v0.1.3の全リリースにpatches.jsonがあることを確認した。今回の公開リリース・pushは行っていない。
+- `adb devices`に接続実機がなく、今回の設定画面操作、AndroidからPCへの実通信、Android省電力下の定期送信、Manager上の再適用、CYD画面は未検証。UIとJobServiceの実動作が確認済みとは扱わない。
+- 実利用の前に、PCで信頼済みHTTPS証明書と読み書き別トークンを設定し、アプリの「保存して送信」→「送信結果を確認」→CYD用GETを確認する。停止・再開、再起動、PC停止、再ログイン要求、期限経過、最終回成功、コード削除後のstale化も実機で確認する。Androidの定期jobは15分以上かつ省電力で遅延し得るため、5分のCYD取得をAndroid側の同期保証と解釈しない。
