@@ -54,6 +54,8 @@ jobs:
           $bundle = $bundles[0]
           ./scripts/verify-android-rvp.ps1 -Path $bundle.FullName
           Copy-Item -LiteralPath $bundle.FullName -Destination dist/povo-2.0-patches.rvp
+          git archive --format=zip --output=dist/povo-cyd-relay.zip HEAD relay LICENSE
+          if ($LASTEXITCODE -ne 0) { throw "Relay archive failed" }
           ./scripts/generate-patches-json.ps1 -Version '${{ steps.version.outputs.version }}' -OutputPath dist/patches.json
           ./scripts/extract-changelog.ps1 -Version '${{ steps.version.outputs.version }}' -OutputPath dist/release-notes.md
 
@@ -62,6 +64,7 @@ jobs:
           subject-path: |
             dist/povo-2.0-patches.rvp
             dist/patches.json
+            dist/povo-cyd-relay.zip
 
       - name: Publish GitHub release
         env:
@@ -70,6 +73,7 @@ jobs:
           gh release create "v${{ steps.version.outputs.version }}"
           dist/povo-2.0-patches.rvp
           dist/patches.json
+          dist/povo-cyd-relay.zip
           --verify-tag
           --title "v${{ steps.version.outputs.version }}"
           --notes-file dist/release-notes.md

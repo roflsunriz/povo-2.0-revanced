@@ -167,6 +167,14 @@ v0.1.3 Android RVPをReVanced Manager 2.6.0へローカル追加し、通常版1
 APKM 展開物、統合 APK、パッチ済み APK、検証用 keystore、CLI、APKEditor は OS の一時領域だけに作成する。リポジトリ内の `povo-2.0-apks` に APKEditor が作る `tmp_*` が残っていないことを検証後に確認する。
 # 2026-09-05: CYD用状態中継API
 
+## v0.2.0公開前検証
+
+- 利用者からpushとreleaseの許可を受け、v0.2.0としてクリーンビルド・lint・Android単体16件・中継API10件を再検証して成功した。
+- Gradleで解決したコンパイル・実行時・単体テスト用のMaven依存34バージョンをOSV APIへ照会し、該当する既知の脆弱性は0件だった。これは解決済みアプリ／パッチ依存の照会結果であり、Gradleプラグイン全体やPython実行環境の包括監査ではない。中継APIに外部Python依存はない。
+- リリースワークフローに `povo-cyd-relay.zip` の作成・公開・provenance対象への追加を行った。実機は引き続きADB接続なし。
+
+## 実装時検証
+
 - `gradlew build :patches:buildAndroid`: 成功。Android単体テスト16件（うちHTTPS送信先・トークン検証3件）、lintエラー0。警告は既存の依存表記、同期的マイグレーション保存、および拡張モジュールのアイコン未指定。拡張はホストpovoのアイコンを使うため独立アプリアイコンを追加しない。
 - `python -B -m unittest relay.test_relay -q`: 10件成功。実HTTPの読み書き認証分離、不正入力拒否、保存・再起動・古い送信拒否、残り秒数・鮮度境界、DB退避復旧を確認。HTTPSは一時localhost SAN証明書を明示信頼してPUT/GETし、未信頼証明書の拒否も確認した。テスト用証明書と秘密鍵は削除済み。
 - 公式配布のReVanced CLI 6.0.0とAPKEditor 1.4.9を使用し、保存済みAPKM 1.68.0、1.69.0、1.70.0を統合してパッチ適用成功。各APKのmanifestでDisplaySyncJobとBIND_JOB_SERVICEを確認。最終RVPのclasses.dex・extension同梱も確認した。
