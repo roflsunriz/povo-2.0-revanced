@@ -182,3 +182,9 @@ APKM 展開物、統合 APK、パッチ済み APK、検証用 keystore、CLI、A
 - 既存v0.1.0〜v0.1.3の全リリースにpatches.jsonがあることを確認した。今回の公開リリース・pushは行っていない。
 - `adb devices`に接続実機がなく、今回の設定画面操作、AndroidからPCへの実通信、Android省電力下の定期送信、Manager上の再適用、CYD画面は未検証。UIとJobServiceの実動作が確認済みとは扱わない。
 - 実利用の前に、PCで信頼済みHTTPS証明書と読み書き別トークンを設定し、アプリの「保存して送信」→「送信結果を確認」→CYD用GETを確認する。停止・再開、再起動、PC停止、再ログイン要求、期限経過、最終回成功、コード削除後のstale化も実機で確認する。Androidの定期jobは15分以上かつ省電力で遅延し得るため、5分のCYD取得をAndroid側の同期保証と解釈しない。
+
+## Dependabot 自動処理（2026-09-23）
+
+`.github/workflows/dependabot-automation.yml` を actionlint で検査し、PR 用 workflow 名（Build）と一致することを確認する。Dependabot の patch／minor かつ全 PR チェック成功の場合だけ取り込み、major・古い SHA・再失敗は残す。
+
+実際の Dependabot PR がまだない場合、動作経路は未検証として扱う。実 PR 発生後に自動化ジョブ、CI の再試行、マージ結果を確認する。

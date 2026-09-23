@@ -100,3 +100,9 @@ CYD用中継APIを変更した場合は `python -B -m unittest relay.test_relay 
 - パッチ版アプリの問題: パッチ版をアンインストールし、Google Play から公式版を再導入して再ログインする。
 - 状態データの問題: 自動更新画面の「コードと履歴を削除」で暗号化コード、時刻、履歴を消去する。
 - release の誤り: release や tag を破壊的に付け替えず、修正版を新しい patch version として公開する。
+
+## Dependabot PR の更新
+
+前提は `.github/dependabot.yml` と PR 用 CI（Build）です。更新 PR の head SHA と `gh pr checks <PR番号>` の結果を確認してください。patch／minor は全チェック成功後に自動取り込みされます。初回 CI 失敗は failed jobs のみを 1 回再実行し、再失敗した PR は残して手動で修正します。
+
+設定を変えたときは `actionlint .github/workflows/dependabot-automation.yml` と実際の PR の Actions 結果を確認します。問題があれば呼び出し先の共通 workflow SHA を直前の検証済み値へ戻すコミットを push します。取り込まれた依存更新に問題があれば通常の revert コミットで復旧します。
