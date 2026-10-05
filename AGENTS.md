@@ -38,3 +38,7 @@ Get-Content -Raw -LiteralPath .\COMMON-AGENTS.md
 ## Environment
 - `povo-2.0-apks`にあるファイルはapkではなくapkm(bundle)である
 - `povo-2.0-apks`にあるapkmで複数世代の適用確認ができる
+
+## Dependabotラベルの運用
+
+- 明示指定のラベルはDependabotが自動初期化するとは限らない。既定ブランチの設定を正本とする専用workflowで不足分だけ維持する。検証と復旧は `how-to-update.md` のDependabotラベル節、回帰は `.github/tests/test-dependabot-labels.py`。既存の自動マージ・承認は別のworkflowであり、ラベルの変更で回避しない。
