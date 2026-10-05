@@ -108,3 +108,19 @@ CYD用中継APIを変更した場合は `python -B -m unittest relay.test_relay 
 設定を変えたときは `actionlint .github/workflows/dependabot-automation.yml` と実際の PR の Actions 結果を確認します。問題があれば呼び出し先の共通 workflow SHA を直前の検証済み値へ戻すコミットを push します。取り込まれた依存更新に問題があれば通常の revert コミットで復旧します。
 
 CI 完了より Dependabot の分類が遅れる場合は、`callback_workflow_file` が指す呼び出し側 workflow を `workflow_dispatch` し、同じ PR 番号・head SHA・全チェックを再確認する。呼び出し側のファイル名を変える際はこの入力も一緒に更新する。
+
+## Dependabotラベルの維持
+
+`.github/workflows/dependabot-labels.yml` は既定ブランチのDependabot設定を読み、`updates` と `multi-ecosystem-groups` が明示指定するラベルの不足分だけ作成します。設定変更、ラベルの編集・削除、毎日04:17 UTC、手動実行で検査します。既存ラベルの色・説明やPRへの付与状態は変更しません。書込権限は専用ジョブの `issues: write` に限定し、PRの検証ジョブは読み取り専用です。
+
+ラベルが不足する場合、Actionsの「Maintain Dependabot labels」を既定ブランチで手動実行し、`All configured Dependabot labels exist` を確認します。権限エラーやarchivedラベルとの競合は失敗として通知されます。Dependabot設定のラベル名を別名へ付け替えたり、CI・承認条件を無効化して回避しないでください。
+
+変更時は次を実行し、Actions上でも検証してください。
+
+```powershell
+python -m pip install PyYAML==6.0.3
+python .github/tests/test-dependabot-labels.py
+actionlint .github/workflows/dependabot-labels.yml
+```
+
+Dependabot更新そのものの成功は、更新ジョブのログと結果で確認します。指定ラベルが無い場合はGitHubの仕様では無視されるため、実際のジョブ失敗をラベル不足だけと決めつけないでください。更新チェックの手動実行はGitHubのDependabot更新画面で提供される場合に使用し、Actions APIが再試行不可と返す実行は成功扱いしません。
