@@ -202,9 +202,7 @@ APKM、APKS、XAPK、`base.apk`だけのファイルは使えません。全spli
 
 ## 公式版を残した検証
 
-「検証用別パッケージID」は既定で無効の開発・実機検証専用パッチです。有効にすると package を `com.kddi.kdla.jp.revanced` へ変更し、provider authority、アプリ固有 permission/action、process も同じ別IDへ変更します。ログイン redirect の URL scheme/host は変更しません。
-
-これにより公式版 `com.kddi.kdla.jp` のアプリデータとログイン状態を残したまま並行インストールできます。検証版は別アプリ扱いなので、利用規約の確認と検証用IDへのログインは改めて必要です。本番利用用 release ではこのパッチを選択しないでください。
+具体的な手順・構成・知見は [findings.md](<findings.md#readme-11>) に移動しました。着手前に該当条件を確認してください。
 
 ## 制約
 
@@ -214,13 +212,7 @@ Androidの電源管理、圏外、povo側の障害、認証失効があるため
 
 ## ビルド
 
-JDK 21、Android SDK、GitHub Packages を読める GitHub token が必要です。
-
-```powershell
-./gradlew build :patches:buildAndroid
-```
-
-成果物は`patches/build/libs/patches-<version>.rvp`です。`buildAndroid`を省略するとManagerが読み込めるDEXが入らないため、通常の`build`だけで作ったRVPを配布しないでください。認証情報をファイルへコミットしないでください。
+具体的な手順・構成・知見は [findings.md](<findings.md#readme-13>) に移動しました。着手前に該当条件を確認してください。
 
 ## ライセンス
 
@@ -228,4 +220,4 @@ GPL-3.0-only。ReVanced のパッチ基盤・テンプレートと互換性の�
 
 ## 依存更新の自動処理
 
-Dependabot は対象の依存関係を毎週確認します。patch／minor 更新は PR のチェック（Build）が成功した後に自動で squash merge されます。CI の失敗ジョブは 1 回だけ再実行します。再失敗した PR は残して手動で修正します。major 更新は手動で確認します。
+具体的な手順・構成・知見は [findings.md](<findings.md#readme-15>) に移動しました。着手前に該当条件を確認してください。
