@@ -217,3 +217,8 @@ APKM 展開物、統合 APK、パッチ済み APK、検証用 keystore、CLI、A
 ## Dependabotラベル再発防止の統合（2026-10-05、公開前）
 
 別タスクで用意した未公開パッチのworkflow・試験・AGENTS・更新手順を統合した。既存文書整備の変更履歴と検証記録を保って追記した。`python .github/tests/test-dependabot-labels.py` は成功。workflowはPR上で読み取り専用試験を実行し、ラベル作成jobはownerがroflsunrizかつ既定ブランチの場合だけ実行する。既存ラベルの色・説明の上書き、PRコードのcheckout、秘密情報の追加はない。GitHub Actionsでの実行結果は公開後に記録する。
+
+## 2026-10-20: Dependabot 月末一括処理
+
+- `.github/dependabot.yml` は毎月28日00:00、`.github/workflows/dependabot-automation.yml` は同日18:00（いずれも `Asia/Tokyo`）に設定した。呼び出し先は検証済み共通 workflow の固定 SHA とし、現在の head SHA、Dependabot の資格状態、全 PR チェック成功を merge 前に再確認する。
+- YAML 構文、変更差分、空白エラーをローカルで検査した。実際の月末 schedule と Dependabot PR の merge 経路は、次回の毎月28日実行で確認する。
